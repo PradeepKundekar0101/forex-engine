@@ -3,7 +3,6 @@ import {
   activeConnections,
   accountEquityHistory,
   EQUITY_LOSS_THRESHOLD,
-  FREEZE_DURATION_MS,
 } from "../constants/global";
 import { CacheManager } from "./cacheManager";
 import Freeze from "../models/frozenAccount";
@@ -148,10 +147,17 @@ export async function freezeAccount(
     handleCloseAllOrders(groupId, accountId);
     handleCloseAllPositions(groupId, accountId);
 
+    const group = CacheManager.getInstance().getGroup(groupId);
+    if (!group) {
+      console.error(
+        `Group ${groupId} not found in cache, ignoring freeze event`
+      );
+      return;
+    }
     // Add to frozen accounts
     const releaseTimeout = setTimeout(() => {
       unfreezeAccount(groupId, accountId);
-    }, FREEZE_DURATION_MS);
+    }, group.freezeDuration);
 
     const releaseTimeoutId = releaseTimeout[Symbol.toPrimitive]
       ? releaseTimeout[Symbol.toPrimitive]()
@@ -161,7 +167,7 @@ export async function freezeAccount(
       CacheManager.getInstance().getFrozenAccounts()[groupId] = {};
     }
 
-    const releaseTime = new Date(Date.now() + FREEZE_DURATION_MS);
+    const releaseTime = new Date(Date.now() + group.freezeDuration);
 
     CacheManager.getInstance().getFrozenAccounts()[groupId][accountId] = {
       accountId,

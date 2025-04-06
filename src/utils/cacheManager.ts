@@ -32,6 +32,8 @@ export interface GroupData {
   name: string;
   description: string;
   participants: ParticipantData[];
+  freezeThreshold: number;
+  freezeDuration: number;
 }
 
 export class CacheManager {
@@ -234,6 +236,8 @@ export class CacheManager {
           name: group.name,
           description: group.description,
           participants: participantData,
+          freezeThreshold: group.freezeThreshold,
+          freezeDuration: group.freezeDuration,
         });
       }
 

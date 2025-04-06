@@ -1,7 +1,6 @@
 import { TrackerEventListener } from "metaapi.cloud-sdk";
 import { freezeAccount } from "../utils/riskmanagement";
 import { CacheManager } from "../utils/cacheManager";
-import { EQUITY_LOSS_THRESHOLD } from "../constants/global";
 
 export class Listener extends TrackerEventListener {
   private groupId: string;
@@ -24,11 +23,8 @@ export class Listener extends TrackerEventListener {
     }
 
     try {
-      // Handle different types of tracker events
       if (trackerEvent.type === "drawdown") {
         await this.handleDrawdownEvent(trackerEvent);
-      } else if (trackerEvent.type === "period-ended") {
-        await this.handlePeriodEndedEvent(trackerEvent);
       }
     } catch (error) {
       console.error(
@@ -46,31 +42,17 @@ export class Listener extends TrackerEventListener {
         this.accountId
       }: ${drawdownPercent.toFixed(2)}%`
     );
-
-    if (drawdownPercent >= EQUITY_LOSS_THRESHOLD) {
+    const group = CacheManager.getInstance().getGroup(this.groupId);
+    if (!group) {
+      console.error(
+        `Group ${this.groupId} not found in cache, ignoring drawdown event`
+      );
+      return;
+    }
+    if (drawdownPercent >= group.freezeThreshold) {
       const reason = `${drawdownPercent.toFixed(
         2
       )}% drawdown detected by risk management tracker`;
-      await freezeAccount(this.groupId, this.accountId, reason, true);
-    }
-  }
-
-  private async handlePeriodEndedEvent(trackerEvent: any) {
-    // Check if there was a significant loss in the period
-    const equityChange = trackerEvent.equityChange || 0;
-    const equityChangePercent = trackerEvent.equityChangePercent || 0;
-
-    console.log(
-      `[Risk Management] Period ended for account ${
-        this.accountId
-      } with equity change: ${equityChangePercent.toFixed(2)}%`
-    );
-
-    // If loss meets or exceeds our threshold, freeze the account
-    if (equityChangePercent <= -EQUITY_LOSS_THRESHOLD) {
-      const reason = `${Math.abs(equityChangePercent).toFixed(
-        2
-      )}% loss detected over tracking period`;
       await freezeAccount(this.groupId, this.accountId, reason, true);
     }
   }

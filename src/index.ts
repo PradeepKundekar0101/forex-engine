@@ -17,7 +17,7 @@ app.use(
     credentials: true,
   })
 );
-const port = 5001;
+const port = 8000;
 
 app.listen(port, "0.0.0.0", () => {
   const mongoConnect = async (uri: string) => {
