@@ -1,10 +1,9 @@
-import {
-  counterTradeTracking,
-  frozenAccounts,
-  orderHistory,
-  orderPositionMapping,
-} from "../constants/global";
+import { orderHistory, orderPositionMapping } from "../constants/global";
 import { CacheManager } from "../utils/cacheManager";
+import {
+  handleCloseAllOrders,
+  handleCloseAllPositions,
+} from "../utils/riskmanagement";
 
 export class OrderSyncListener {
   accountId: string;
@@ -45,21 +44,16 @@ export class OrderSyncListener {
       if (!orderPositionMapping[this.groupId][this.accountId]) {
         orderPositionMapping[this.groupId][this.accountId] = {};
       }
-      // CacheManager.getInstance().setOrders(this.accountId, order);
       orderPositionMapping[this.groupId][this.accountId][order.positionId] =
         order.id;
     }
 
-    // Check if account is frozen, if so, perform counter trade
-    if (frozenAccounts[this.groupId]?.[this.accountId]) {
-      // Check if this is our own counter order
-      if (order.comment && order.comment.includes("RM Counter")) {
-        console.log(
-          `[Risk Management] Order ${order.id} is a counter order, skipping to prevent loops`
-        );
-      } else {
-        // handleCounterOrder(this.groupId, this.accountId, order, "syncListener");
-      }
+    if (
+      CacheManager.getInstance().getFrozenAccounts()[this.groupId]?.[
+        this.accountId
+      ]
+    ) {
+      handleCloseAllOrders(this.groupId, this.accountId);
     }
   }
 
@@ -67,10 +61,12 @@ export class OrderSyncListener {
     console.log(
       `[Account: ${this.groupId}:${this.accountId}] All orders replaced. Count: ${orders.length}`
     );
-    if (frozenAccounts[this.groupId]?.[this.accountId]) {
-      for (const order of orders) {
-        // handleCounterOrder(this.groupId, this.accountId, order, "syncListener");
-      }
+    if (
+      CacheManager.getInstance().getFrozenAccounts()[this.groupId]?.[
+        this.accountId
+      ]
+    ) {
+      handleCloseAllOrders(this.groupId, this.accountId);
     }
   }
 
@@ -112,41 +108,12 @@ export class OrderSyncListener {
       position
     );
 
-    // If account is frozen, place a counter position
-    if (frozenAccounts[this.groupId]?.[this.accountId]) {
-      // Check if this is our own counter position first
-      if (position.comment && position.comment.includes("RM Counter")) {
-        console.log(
-          `[Risk Management] Position ${positionId} is a counter position, skipping to prevent loops`
-        );
-      } else {
-        // Check if this position was created by an order we've already countered
-        const relatedOrderId =
-          orderPositionMapping[this.groupId][this.accountId]?.[positionId];
-        const orderCounterTrackingId = relatedOrderId
-          ? `order_${relatedOrderId}`
-          : null;
-
-        // Only process if we haven't already countered a related order
-        if (
-          orderCounterTrackingId &&
-          counterTradeTracking[this.groupId]?.[this.accountId]?.has(
-            orderCounterTrackingId
-          )
-        ) {
-          console.log(
-            `[Risk Management] Position ${positionId} came from order ${relatedOrderId} which was already countered, skipping`
-          );
-        } else {
-          //   handleCounterPosition(
-          //     this.groupId,
-          //     this.accountId,
-          //     positionId,
-          //     position,
-          //     "syncListener"
-          //   );
-        }
-      }
+    if (
+      CacheManager.getInstance().getFrozenAccounts()[this.groupId]?.[
+        this.accountId
+      ]
+    ) {
+      handleCloseAllPositions(this.groupId, this.accountId);
     }
   }
 
@@ -155,18 +122,12 @@ export class OrderSyncListener {
       `[Account: ${this.groupId}:${this.accountId}] All positions replaced. Count: ${positions.length}`
     );
 
-    // Check if account is frozen, if so, perform counter trades
-    if (frozenAccounts[this.groupId]?.[this.accountId]) {
-      // Process all positions for counter trades
-      for (const position of positions) {
-        // handleCounterPosition(
-        //   this.groupId,
-        //   this.accountId,
-        //   position.id,
-        //   position,
-        //   "syncListener"
-        // );
-      }
+    if (
+      CacheManager.getInstance().getFrozenAccounts()[this.groupId]?.[
+        this.accountId
+      ]
+    ) {
+      handleCloseAllPositions(this.groupId, this.accountId);
     }
   }
 

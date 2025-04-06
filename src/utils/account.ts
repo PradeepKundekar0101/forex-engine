@@ -1,6 +1,11 @@
-import { activeConnections, api } from "../constants/global";
+import {
+  activeConnections,
+  api,
+  riskManagement,
+  trackers,
+} from "../constants/global";
 import { OrderSyncListener } from "../services/OrderSyncListener";
-// import { cleanupFrozenAccount } from "./riskmanagement";
+import { Listener } from "../services/TrackerListener";
 
 export const connectToAccount = async (accountId: string, groupId: string) => {
   try {
@@ -24,21 +29,38 @@ export const connectToAccount = async (accountId: string, groupId: string) => {
     );
     await account.waitConnected();
 
-    // Connect to MetaApi API
     let connection = account.getStreamingConnection();
     await connection.connect();
 
+    let riskManagementApi = riskManagement.riskManagementApi;
+    if (!account.riskManagementApiEnabled) {
+      console.log(`Risk management is not enabled for account ${accountId}`);
+    }
+    if (!trackers.find((t) => t.accountId === accountId)) {
+      let tracker = await riskManagementApi.createTracker(accountId, {
+        name: "Risk Management Tracker",
+        period: "day",
+        relativeDrawdownThreshold: 0.05,
+      });
+      trackers.push({
+        groupId,
+        accountId,
+        tracker,
+      });
+    }
     // Add the synchronization listener to track real-time events
     const listener = new OrderSyncListener(groupId, accountId);
     connection.addSynchronizationListener(listener as any);
 
-    // Wait until terminal state synchronized to the local state
+    const trackerListener = new Listener(groupId, accountId);
+
+    riskManagementApi.addTrackerEventListener(trackerListener);
+
     console.log(
       `Waiting for SDK to synchronize terminal state for account: ${accountId}`
     );
     await connection.waitSynchronized();
 
-    // Store connection information
     activeConnections.push({
       groupId,
       accountId,
@@ -48,7 +70,6 @@ export const connectToAccount = async (accountId: string, groupId: string) => {
       initialState,
     });
 
-    // Log account is connected and synchronized
     console.log(
       `Account ${accountId} in group ${groupId} connected and synchronized`
     );

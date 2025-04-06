@@ -9,11 +9,12 @@ const freezeSchema = new mongoose.Schema(
     frozenAt: { type: Date, default: Date.now, index: true },
     initialEquity: { type: Number, required: true },
     releasedAt: { type: Date },
+    releaseTime: { type: Date },
     groupId: { type: String, required: true, index: true },
     active: { type: Boolean, default: true, index: true },
   },
   {
-    timestamps: true, // Adds createdAt and updatedAt fields automatically
+    timestamps: true,
   }
 );
 

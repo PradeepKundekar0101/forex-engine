@@ -38,7 +38,8 @@ export class CacheManager {
   private static instance: CacheManager;
   private groups: Map<string, GroupData> = new Map();
   private participants: Map<string, ParticipantData> = new Map();
-  private pendingDeals: Map<string, any[]> = new Map(); // Store deals that come in before participants are initialized
+  private pendingDeals: Map<string, any[]> = new Map();
+  private frozenAccounts: Record<string, Record<string, any>> = {};
   private refreshInterval: NodeJS.Timeout | null = null;
   private tradingDataRefreshInterval: NodeJS.Timeout | null = null;
   private lastRefresh: number = 0;
@@ -115,9 +116,15 @@ export class CacheManager {
       const groups = await Group.find();
       const newGroups: Map<string, GroupData> = new Map();
       const newParticipants: Map<string, ParticipantData> = new Map();
+      const newFrozenAccounts: Record<string, Record<string, any>> = {};
 
       for (const group of groups) {
         const groupId = group._id.toString();
+
+        if (!newFrozenAccounts[groupId]) {
+          newFrozenAccounts[groupId] = {};
+        }
+
         const participants = await GroupParticipant.find({
           groupId: group._id,
           status: "approved",
@@ -174,6 +181,12 @@ export class CacheManager {
           });
           const freezeCount = freezeHistory.length;
 
+          // Store freeze details in the frozenAccounts object
+          if (freezeHistory.length > 0) {
+            const latestFreeze = freezeHistory[freezeHistory.length - 1];
+            newFrozenAccounts[groupId][accountId] = latestFreeze;
+          }
+
           const existingParticipant = this.participants.get(accountId);
 
           const balance =
@@ -226,6 +239,7 @@ export class CacheManager {
 
       this.groups = newGroups;
       this.participants = newParticipants;
+      this.frozenAccounts = newFrozenAccounts;
       this.lastRefresh = Date.now();
 
       console.log(
@@ -319,7 +333,6 @@ export class CacheManager {
         }
       );
 
-      // Wait for all updates to complete in parallel
       await Promise.all(updatePromises);
 
       this.lastTradingDataRefresh = Date.now();
@@ -353,13 +366,8 @@ export class CacheManager {
     queueIfMissing: boolean = true
   ): Promise<void> {
     try {
-      console.log("Adding deal---", deal);
-      console.log("accountId---", accountId);
-
       const participant = this.participants.get(accountId);
-      console.log("participant---", participant);
 
-      // If participant not found and queueIfMissing is true, queue the deal for processing later
       if (!participant && queueIfMissing) {
         console.log(
           `Account ${accountId} not found in cache, queueing deal for later processing`
@@ -455,23 +463,41 @@ export class CacheManager {
       (a, b) => b.pnlPercentage - a.pnlPercentage
     );
     const group = this.getGroup(groupId);
-    return sortedParticipants.map((participant, index) => ({
-      accountId: participant.accountId,
-      name: participant.name,
-      pnlPercentage: participant.pnlPercentage,
-      totalFreezesCount: participant.freezeCount,
-      totalTrades: participant.deals.length,
-      groupName: group?.name || "",
-      groupId,
-      rank: index + 1,
-      profitLoss: participant.profitLoss,
-      balance: participant.balance,
-      equity: participant.equity,
-      userName: participant.firstName + " " + participant.lastName,
-      email: participant.email,
-      phoneNumber: participant.phonenumber,
-      userId: participant.userId,
-    }));
+    return sortedParticipants.map((participant, index) => {
+      let freezeDetails =
+        this.frozenAccounts[groupId]?.[participant.accountId] || {};
+
+      if (freezeDetails && typeof freezeDetails.toObject === "function") {
+        freezeDetails = freezeDetails.toObject();
+      } else if (freezeDetails && freezeDetails._doc) {
+        freezeDetails = freezeDetails._doc;
+      } else if (freezeDetails) {
+        freezeDetails = { ...freezeDetails };
+      }
+
+      if (freezeDetails) {
+        delete freezeDetails._releaseTimeout;
+      }
+
+      return {
+        accountId: participant.accountId,
+        name: participant.name,
+        pnlPercentage: participant.pnlPercentage,
+        totalFreezesCount: participant.freezeCount,
+        totalTrades: participant.deals.length,
+        groupName: group?.name || "",
+        groupId,
+        rank: index + 1,
+        profitLoss: participant.profitLoss,
+        balance: participant.balance,
+        equity: participant.equity,
+        userName: participant.firstName + " " + participant.lastName,
+        email: participant.email,
+        phoneNumber: participant.phonenumber,
+        userId: participant.userId,
+        freezeDetails,
+      };
+    });
   }
 
   public getLastRefreshTime(): number {
@@ -493,19 +519,20 @@ export class CacheManager {
     return undefined;
   }
 
-  /**
-   * Process any deals that were received before participants were initialized
-   */
   private async processPendingDeals(): Promise<void> {
     for (const [accountId, deals] of this.pendingDeals.entries()) {
       console.log(
         `Processing ${deals.length} pending deals for account ${accountId}`
       );
       for (const deal of deals) {
-        await this.addDeal(accountId, deal, false); // Pass false to avoid re-queueing
+        await this.addDeal(accountId, deal, false);
       }
     }
     this.pendingDeals.clear();
+  }
+
+  public getFrozenAccounts(): Record<string, Record<string, any>> {
+    return this.frozenAccounts;
   }
 }
 

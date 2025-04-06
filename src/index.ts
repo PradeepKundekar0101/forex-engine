@@ -5,6 +5,8 @@ import express from "express";
 import { CacheManager } from "./utils/cacheManager";
 import accountRoutes from "./routes/account";
 import leaderboardRoutes from "./routes/leaderboard";
+import riskmanagementRoutes from "./routes/riskmanagement";
+import { restoreFreezeTimeouts } from "./utils/riskmanagement";
 dotenv.config();
 
 const app = express();
@@ -21,10 +23,13 @@ app.listen(port, () => {
   const mongoConnect = async (uri: string) => {
     try {
       const { connection } = await mongoose.connect(uri, {
-        dbName: "EarningEdge:Dev",
+        dbName: "EarningEdge:Production",
       });
       console.log(`MongoDB connected to ${connection.host}`);
       console.log("===========================");
+
+      // Restore freeze timeouts after MongoDB connection is established
+      await restoreFreezeTimeouts();
     } catch (error) {
       console.log("MongoDB connection failed", error);
       return Promise.reject(error);
@@ -37,3 +42,4 @@ app.listen(port, () => {
 
 app.use("/api/account", accountRoutes);
 app.use("/api/leaderboard", leaderboardRoutes);
+app.use("/api/riskmanagement", riskmanagementRoutes);
