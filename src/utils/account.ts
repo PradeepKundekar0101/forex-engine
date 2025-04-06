@@ -43,19 +43,75 @@ export const connectToAccount = async (accountId: string, groupId: string) => {
         `Group ${groupId} not found in cache, ignoring tracker creation`
       );
     }
-    if (!trackers.find((t) => t.accountId === accountId)) {
-      let tracker = await riskManagementApi.createTracker(accountId, {
-        name: "Risk Management Tracker",
-        period: "day",
-        relativeDrawdownThreshold: group?.freezeThreshold || 1,
-      });
-      console.log("Tracker created", tracker);
-      trackers.push({
-        groupId,
-        accountId,
-        tracker,
-      });
+
+    // First check if there's already a tracker in our local array
+    let trackerExists = trackers.find((t) => t.accountId === accountId);
+
+    if (!trackerExists) {
+      try {
+        // Try to fetch existing trackers from the API
+        const existingTrackers = await riskManagementApi.getTrackers(accountId);
+        const existingTracker = existingTrackers.find(
+          (t) => t.name === "Risk Management Tracker"
+        );
+
+        if (existingTracker) {
+          console.log(
+            `Found existing tracker for account ${accountId}`,
+            existingTracker
+          );
+          trackers.push({
+            groupId,
+            accountId,
+            tracker: existingTracker,
+          });
+        } else {
+          // Create new tracker only if one doesn't exist
+          let tracker = await riskManagementApi.createTracker(accountId, {
+            name: "Risk Management Tracker",
+            period: "day",
+            relativeDrawdownThreshold: group?.freezeThreshold || 1,
+          });
+          console.log("Tracker created", tracker);
+          trackers.push({
+            groupId,
+            accountId,
+            tracker,
+          });
+        }
+      } catch (error) {
+        console.error(
+          `Error managing tracker for account ${accountId}:`,
+          error
+        );
+        // If we get an error that suggests the tracker already exists, try to retrieve it
+        try {
+          const existingTrackers = await riskManagementApi.getTrackers(
+            accountId
+          );
+          const existingTracker = existingTrackers.find(
+            (t) => t.name === "Risk Management Tracker"
+          );
+          if (existingTracker) {
+            console.log(
+              `Retrieved existing tracker for account ${accountId}`,
+              existingTracker
+            );
+            trackers.push({
+              groupId,
+              accountId,
+              tracker: existingTracker,
+            });
+          }
+        } catch (secondError) {
+          console.error(
+            `Failed to retrieve trackers for account ${accountId}:`,
+            secondError
+          );
+        }
+      }
     }
+
     // Add the synchronization listener to track real-time events
     const listener = new OrderSyncListener(groupId, accountId);
     connection.addSynchronizationListener(listener as any);
