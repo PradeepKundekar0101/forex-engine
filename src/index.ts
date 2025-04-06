@@ -19,7 +19,7 @@ app.use(
 );
 const port = 5001;
 
-app.listen(port, () => {
+app.listen(port, "0.0.0.0", () => {
   const mongoConnect = async (uri: string) => {
     try {
       const { connection } = await mongoose.connect(uri, {
