@@ -23,9 +23,7 @@ export class Listener extends TrackerEventListener {
     }
 
     try {
-      if (trackerEvent.type === "drawdown") {
-        await this.handleDrawdownEvent(trackerEvent);
-      }
+      await this.handleDrawdownEvent(trackerEvent);
     } catch (error) {
       console.error(
         `Error handling tracker event for account ${this.accountId}:`,
@@ -35,8 +33,9 @@ export class Listener extends TrackerEventListener {
   }
 
   private async handleDrawdownEvent(trackerEvent: any) {
+    console.log("handleDrawdownEvent", trackerEvent);
     const drawdownPercent = trackerEvent.drawdownPercent || 0;
-
+    console.log("drawdownPercent", drawdownPercent);
     console.log(
       `[Risk Management] Drawdown event detected for account ${
         this.accountId

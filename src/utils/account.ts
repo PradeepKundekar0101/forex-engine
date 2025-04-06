@@ -6,6 +6,7 @@ import {
 } from "../constants/global";
 import { OrderSyncListener } from "../services/OrderSyncListener";
 import { Listener } from "../services/TrackerListener";
+import { CacheManager } from "./cacheManager";
 
 export const connectToAccount = async (accountId: string, groupId: string) => {
   try {
@@ -36,12 +37,19 @@ export const connectToAccount = async (accountId: string, groupId: string) => {
     if (!account.riskManagementApiEnabled) {
       console.log(`Risk management is not enabled for account ${accountId}`);
     }
+    const group = CacheManager.getInstance().getGroup(groupId);
+    if (!group) {
+      console.error(
+        `Group ${groupId} not found in cache, ignoring tracker creation`
+      );
+    }
     if (!trackers.find((t) => t.accountId === accountId)) {
       let tracker = await riskManagementApi.createTracker(accountId, {
         name: "Risk Management Tracker",
         period: "day",
-        relativeDrawdownThreshold: 0.05,
+        relativeDrawdownThreshold: group?.freezeThreshold || 1,
       });
+      console.log("Tracker created", tracker);
       trackers.push({
         groupId,
         accountId,
