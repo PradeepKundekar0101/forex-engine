@@ -137,6 +137,9 @@ export class OrderSyncListener {
       dealId,
       recordedAt: new Date().toISOString(),
     };
+    if (deal.comment === "RM Emergency Close") {
+      return;
+    }
     CacheManager.getInstance().addDeal(this.accountId, deal);
     // Initialize deals history if it doesn't exist
     if (!orderHistory[this.groupId][this.accountId].deals) {
