@@ -6,6 +6,7 @@ import User from "../models/user";
 import { activeConnections } from "../constants/global";
 import { connectToAccount } from "../utils/account";
 import Deal from "../models/deal";
+import { freezeAccount } from "./riskmanagement";
 
 export interface ParticipantData {
   userId: string;
@@ -267,7 +268,6 @@ export class CacheManager {
     try {
       this.tradingDataRefreshInProgress = true;
 
-      // Create an array of promises for each participant update
       const updatePromises = Array.from(this.participants.entries()).map(
         async ([accountId, participant]) => {
           const { groupId } = participant;
@@ -278,7 +278,6 @@ export class CacheManager {
             );
 
             if (!connection) {
-              // If connection doesn't exist, try to establish it
               connection = await connectToAccount(accountId, groupId);
               if (!connection) {
                 console.error(
@@ -288,10 +287,9 @@ export class CacheManager {
               }
             }
 
-            // Update the trading data
             const terminalState = connection.connection.terminalState;
+            const group = this.groups.get(groupId);
             if (terminalState) {
-              // Update account information and trading data
               const accountInfo = terminalState.accountInformation;
               if (accountInfo) {
                 const balance = accountInfo.balance || 0;
@@ -304,21 +302,19 @@ export class CacheManager {
                 participant.pnlPercentage = parseFloat(
                   pnlPercentage.toFixed(2)
                 );
-                participant.profitLoss = pnlPercentage;
+
+                participant.profitLoss = equity - balance;
+                if (group && pnlPercentage <= group?.freezeThreshold) {
+                  await freezeAccount(groupId, accountId, "Drawdown", true);
+                }
               }
 
-              // Update positions, orders, deals
               participant.positions = terminalState.positions || [];
               participant.orders = terminalState.orders || [];
-              // Deals might be updated elsewhere, so we don't override them here if they exist
-
-              // Update the trade count based on deals
               participant.tradeCount = participant.deals
                 ? participant.deals.length
                 : 0;
 
-              // Update the corresponding group data
-              const group = this.groups.get(groupId);
               if (group) {
                 const participantIndex = group.participants.findIndex(
                   (p) => p.accountId === accountId
@@ -397,7 +393,6 @@ export class CacheManager {
             };
             console.log("Updating deal", newDeal);
 
-            // Only update cache if not already there
             const existingDealInCache = group.participants[
               participantIndex
             ].deals.find((d) => d.dealId === deal.id);
@@ -412,7 +407,6 @@ export class CacheManager {
       }
     } catch (error: any) {
       if (error.code !== 11000) {
-        // Not a duplicate key error
         console.error(`Error adding deal for account ${accountId}:`, error);
       }
     }
@@ -423,7 +417,6 @@ export class CacheManager {
     if (participant) {
       participant.positions = positions;
 
-      // Update the corresponding group data
       if (participant.groupId) {
         const group = this.groups.get(participant.groupId);
         if (group) {
@@ -443,7 +436,6 @@ export class CacheManager {
     if (participant) {
       participant.orders = orders;
 
-      // Update the corresponding group data
       if (participant.groupId) {
         const group = this.groups.get(participant.groupId);
         if (group) {
