@@ -230,6 +230,97 @@ export async function unfreezeAccount(groupId: string, accountId: string) {
     console.log(
       `[Risk Management] Updated freeze records in MongoDB for account ${accountId}`
     );
+
+    // Force reconnect to account to ensure fresh data
+    let connection = activeConnections.find(
+      (conn) => conn.accountId === accountId && conn.groupId === groupId
+    );
+
+    if (!connection) {
+      console.log(
+        `[Risk Management] Reconnecting to account ${accountId} after unfreeze`
+      );
+      try {
+        const { connectToAccount } = require("./account");
+        connection = await connectToAccount(accountId, groupId);
+      } catch (reconnectError) {
+        console.error(
+          `[Risk Management] Error reconnecting to account ${accountId} after unfreeze:`,
+          reconnectError
+        );
+      }
+    } else if (connection.connection.status !== "connected") {
+      console.log(
+        `[Risk Management] Reconnecting existing connection for account ${accountId}`
+      );
+      try {
+        await connection.connection.connect();
+        await connection.connection.waitSynchronized();
+      } catch (reconnectError) {
+        console.error(
+          `[Risk Management] Error reconnecting existing connection for account ${accountId}:`,
+          reconnectError
+        );
+      }
+    }
+
+    // Force a refresh of trading data for this account
+    const cacheManager = CacheManager.getInstance();
+    const participant = cacheManager.getParticipant(accountId);
+
+    if (participant && connection) {
+      try {
+        const terminalState = connection.connection.terminalState;
+        if (terminalState && terminalState.accountInformation) {
+          const accountInfo = terminalState.accountInformation;
+          const balance = accountInfo.balance || 0;
+          const equity = accountInfo.equity || 0;
+          const pnlPercentage =
+            balance > 0 ? ((equity - balance) / balance) * 100 : 0;
+
+          participant.balance = balance;
+          participant.equity = equity;
+          participant.pnlPercentage = parseFloat(pnlPercentage.toFixed(2));
+          participant.profitLoss = equity - balance;
+          participant.positions = terminalState.positions || [];
+          participant.orders = terminalState.orders || [];
+
+          // Also update the participant in the group's participants array
+          const group = cacheManager.getGroup(groupId);
+          if (group) {
+            const participantIndex = group.participants.findIndex(
+              (p) => p.accountId === accountId
+            );
+            if (participantIndex !== -1) {
+              group.participants[participantIndex].balance = balance;
+              group.participants[participantIndex].equity = equity;
+              group.participants[participantIndex].pnlPercentage = parseFloat(
+                pnlPercentage.toFixed(2)
+              );
+              group.participants[participantIndex].profitLoss =
+                equity - balance;
+              group.participants[participantIndex].positions =
+                terminalState.positions || [];
+              group.participants[participantIndex].orders =
+                terminalState.orders || [];
+
+              console.log(
+                `[Risk Management] Updated group participant data for account ${accountId} in group ${groupId}`
+              );
+            }
+          }
+
+          console.log(
+            `[Risk Management] Updated trading data for account ${accountId} after unfreeze`
+          );
+        }
+      } catch (dataRefreshError) {
+        console.error(
+          `[Risk Management] Error refreshing trading data for account ${accountId}:`,
+          dataRefreshError
+        );
+      }
+    }
   } catch (error) {
     console.error(
       `[Risk Management] Error updating freeze records in MongoDB:`,
