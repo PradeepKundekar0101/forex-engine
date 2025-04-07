@@ -304,7 +304,11 @@ export class CacheManager {
                 );
 
                 participant.profitLoss = equity - balance;
-                if (group && pnlPercentage <= group?.freezeThreshold) {
+                if (
+                  group &&
+                  pnlPercentage < 0 &&
+                  Math.abs(pnlPercentage) >= group?.freezeThreshold
+                ) {
                   await freezeAccount(groupId, accountId, "Drawdown", true);
                 }
               }
