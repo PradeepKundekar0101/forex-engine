@@ -218,7 +218,7 @@ export class CacheManager {
               [],
             balance,
             equity,
-            profitLoss: pnlPercentage,
+            profitLoss: equity - balance,
             firstName: userData?.firstName || "",
             lastName: userData?.lastName || "",
             email: userData?.email || "",
@@ -455,14 +455,45 @@ export class CacheManager {
   }
 
   public getLeaderboard(groupId: string): any[] {
+    // Force refresh all accounts in the group that were previously frozen
+    // but don't wait for the refresh to complete - do it asynchronously
     const participants = this.getGroupParticipants(groupId);
-    if (!participants.length) {
+    for (const participant of participants) {
+      const accountId = participant.accountId;
+      // Check if this account was recently unfrozen
+      // This is a heuristic: if it has freeze count > 0 but is not in frozenAccounts
+      if (
+        participant.freezeCount > 0 &&
+        !this.frozenAccounts[groupId]?.[accountId]
+      ) {
+        this.forceRefreshAccountData(groupId, accountId).catch((error) => {
+          console.error(
+            `Error refreshing previously frozen account ${accountId}:`,
+            error
+          );
+        });
+      }
+    }
+
+    // Get the participants again to ensure we have the latest data
+    const currentParticipants = this.getGroupParticipants(groupId);
+    if (!currentParticipants.length) {
       return [];
     }
-    const sortedParticipants = [...participants].sort(
+
+    const sortedParticipants = [...currentParticipants].sort(
       (a, b) => b.pnlPercentage - a.pnlPercentage
     );
     const group = this.getGroup(groupId);
+
+    // Log current data for debugging
+    console.log(`getLeaderboard for group ${groupId}:`);
+    for (const p of sortedParticipants) {
+      console.log(
+        `Account ${p.accountId}: PNL=${p.pnlPercentage}, Equity=${p.equity}, Balance=${p.balance}, ProfitLoss=${p.profitLoss}`
+      );
+    }
+
     return sortedParticipants.map((participant, index) => {
       let freezeDetails =
         this.frozenAccounts[groupId]?.[participant.accountId] || {};
@@ -534,6 +565,102 @@ export class CacheManager {
 
   public getFrozenAccounts(): Record<string, Record<string, any>> {
     return this.frozenAccounts;
+  }
+
+  // Add a method to force refresh data for a specific account
+  public async forceRefreshAccountData(
+    groupId: string,
+    accountId: string
+  ): Promise<boolean> {
+    try {
+      let connection = activeConnections.find(
+        (conn) => conn.accountId === accountId && conn.groupId === groupId
+      );
+
+      if (!connection) {
+        console.log(`Force reconnecting to account ${accountId}`);
+        const { connectToAccount } = require("./account");
+        connection = await connectToAccount(accountId, groupId);
+        if (!connection) {
+          console.error(
+            `Failed to connect to account ${accountId} in group ${groupId}`
+          );
+          return false;
+        }
+      } else if (connection.connection.status !== "connected") {
+        console.log(
+          `Force reconnecting existing connection for account ${accountId}`
+        );
+        try {
+          await connection.connection.connect();
+          await connection.connection.waitSynchronized();
+        } catch (reconnectError) {
+          console.error(
+            `Error reconnecting existing connection for account ${accountId}:`,
+            reconnectError
+          );
+          return false;
+        }
+      }
+
+      const participant = this.getParticipant(accountId);
+      if (!participant) {
+        console.error(`Participant ${accountId} not found in cache`);
+        return false;
+      }
+
+      // Get the latest trading data from the connection
+      const terminalState = connection.connection.terminalState;
+      if (terminalState && terminalState.accountInformation) {
+        const accountInfo = terminalState.accountInformation;
+        const balance = accountInfo.balance || 0;
+        const equity = accountInfo.equity || 0;
+        const pnlPercentage =
+          balance > 0 ? ((equity - balance) / balance) * 100 : 0;
+
+        // Update participant in the participants map
+        participant.balance = balance;
+        participant.equity = equity;
+        participant.pnlPercentage = parseFloat(pnlPercentage.toFixed(2));
+        participant.profitLoss = equity - balance;
+        participant.positions = terminalState.positions || [];
+        participant.orders = terminalState.orders || [];
+
+        // Also update the participant in the group's participants array
+        const group = this.getGroup(groupId);
+        if (group) {
+          const participantIndex = group.participants.findIndex(
+            (p) => p.accountId === accountId
+          );
+          if (participantIndex !== -1) {
+            // Deep copy all the updated values
+            group.participants[participantIndex].balance = balance;
+            group.participants[participantIndex].equity = equity;
+            group.participants[participantIndex].pnlPercentage = parseFloat(
+              pnlPercentage.toFixed(2)
+            );
+            group.participants[participantIndex].profitLoss = equity - balance;
+            group.participants[participantIndex].positions =
+              terminalState.positions || [];
+            group.participants[participantIndex].orders =
+              terminalState.orders || [];
+          }
+        }
+
+        console.log(
+          `Force refreshed trading data for account ${accountId} in group ${groupId}`
+        );
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error(
+        `Error force refreshing data for account ${accountId}:`,
+        error
+      );
+      return false;
+    }
   }
 }
 
