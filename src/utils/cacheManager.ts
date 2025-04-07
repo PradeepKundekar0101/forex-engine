@@ -309,6 +309,9 @@ export class CacheManager {
                   pnlPercentage < 0 &&
                   Math.abs(pnlPercentage) >= group?.freezeThreshold
                 ) {
+                  console.log("pnlPercentage", pnlPercentage);
+                  console.log("group?.freezeThreshold", group?.freezeThreshold);
+                  console.log("Freezing account", accountId);
                   await freezeAccount(groupId, accountId, "Drawdown", true);
                 }
               }
