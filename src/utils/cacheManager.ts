@@ -36,6 +36,7 @@ export interface GroupData {
   participants: ParticipantData[];
   freezeThreshold: number;
   freezeDuration: number;
+  initialBalance: number;
 }
 
 export class CacheManager {
@@ -195,8 +196,11 @@ export class CacheManager {
           const equity =
             connection?.connection.terminalState.accountInformation?.equity ||
             0;
+          const initialBalance = group ? group.initialBalance || 0 : 0;
           const pnlPercentage =
-            balance > 0 ? ((equity - balance) / balance) * 100 : 0;
+            initialBalance > 0
+              ? ((equity - initialBalance) / initialBalance) * 100
+              : 0;
           const name = connection?.account.name || `User ${accountId}`;
 
           const data: ParticipantData = {
@@ -218,7 +222,7 @@ export class CacheManager {
               [],
             balance,
             equity,
-            profitLoss: equity - balance,
+            profitLoss: equity - initialBalance,
             firstName: userData?.firstName || "",
             lastName: userData?.lastName || "",
             email: userData?.email || "",
@@ -237,6 +241,7 @@ export class CacheManager {
           participants: participantData,
           freezeThreshold: group.freezeThreshold,
           freezeDuration: group.freezeDuration,
+          initialBalance: group.initialBalance || 0,
         });
       }
 
@@ -291,8 +296,11 @@ export class CacheManager {
               if (accountInfo) {
                 const balance = accountInfo.balance || 0;
                 const equity = accountInfo.equity || 0;
+                const initialBalance = group ? group.initialBalance || 0 : 0;
                 const pnlPercentage =
-                  balance > 0 ? ((equity - balance) / balance) * 100 : 0;
+                  initialBalance > 0
+                    ? ((equity - initialBalance) / initialBalance) * 100
+                    : 0;
 
                 participant.balance = balance;
                 participant.equity = equity;
@@ -300,7 +308,7 @@ export class CacheManager {
                   pnlPercentage.toFixed(2)
                 );
 
-                participant.profitLoss = equity - balance;
+                participant.profitLoss = equity - initialBalance;
                 if (
                   group &&
                   pnlPercentage < 0 &&
@@ -615,34 +623,39 @@ export class CacheManager {
         const accountInfo = terminalState.accountInformation;
         const balance = accountInfo.balance || 0;
         const equity = accountInfo.equity || 0;
+        const group = this.getGroup(groupId);
+        const initialBalance = group ? group.initialBalance || 0 : 0;
         const pnlPercentage =
-          balance > 0 ? ((equity - balance) / balance) * 100 : 0;
+          initialBalance > 0
+            ? ((equity - initialBalance) / initialBalance) * 100
+            : 0;
 
         // Update participant in the participants map
         participant.balance = balance;
         participant.equity = equity;
         participant.pnlPercentage = parseFloat(pnlPercentage.toFixed(2));
-        participant.profitLoss = equity - balance;
+        participant.profitLoss = equity - initialBalance;
         participant.positions = terminalState.positions || [];
         participant.orders = terminalState.orders || [];
 
         // Also update the participant in the group's participants array
-        const group = this.getGroup(groupId);
-        if (group) {
-          const participantIndex = group.participants.findIndex(
+        const groupData = this.getGroup(groupId);
+        if (groupData) {
+          const participantIndex = groupData.participants.findIndex(
             (p) => p.accountId === accountId
           );
           if (participantIndex !== -1) {
             // Deep copy all the updated values
-            group.participants[participantIndex].balance = balance;
-            group.participants[participantIndex].equity = equity;
-            group.participants[participantIndex].pnlPercentage = parseFloat(
+            groupData.participants[participantIndex].balance = balance;
+            groupData.participants[participantIndex].equity = equity;
+            groupData.participants[participantIndex].pnlPercentage = parseFloat(
               pnlPercentage.toFixed(2)
             );
-            group.participants[participantIndex].profitLoss = equity - balance;
-            group.participants[participantIndex].positions =
+            groupData.participants[participantIndex].profitLoss =
+              equity - initialBalance;
+            groupData.participants[participantIndex].positions =
               terminalState.positions || [];
-            group.participants[participantIndex].orders =
+            groupData.participants[participantIndex].orders =
               terminalState.orders || [];
           }
         }

@@ -12,6 +12,7 @@ const groupSchema = new Schema({
   freezeThreshold: { type: Number, default: 0 },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
+  initialBalance: { type: Number, default: 0 },
 });
 
 const Group = model("Group", groupSchema);
