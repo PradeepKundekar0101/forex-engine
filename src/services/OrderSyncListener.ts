@@ -4,6 +4,7 @@ import {
   handleCloseAllOrders,
   handleCloseAllPositions,
 } from "../utils/riskmanagement";
+import { activeConnections } from "../constants/global";
 
 export class OrderSyncListener {
   accountId: string;
@@ -34,9 +35,42 @@ export class OrderSyncListener {
       accountInformation
     );
 
-    // if (accountInformation && typeof accountInformation.equity === "number") {
-    //   checkAccountRisk(this.groupId, this.accountId, accountInformation);
-    // }
+    if (accountInformation && typeof accountInformation.equity === "number") {
+      // checkAccountRisk(this.groupId, this.accountId, accountInformation);
+
+      // Update trading data in the cache immediately
+      const participant = CacheManager.getInstance().getParticipant(
+        this.accountId
+      );
+      if (participant) {
+        const balance = accountInformation.balance || 0;
+        const equity = accountInformation.equity || 0;
+        const pnlPercentage =
+          balance > 0 ? ((equity - balance) / balance) * 100 : 0;
+
+        // Update participant in the participants map
+        participant.balance = balance;
+        participant.equity = equity;
+        participant.pnlPercentage = parseFloat(pnlPercentage.toFixed(2));
+        participant.profitLoss = equity - balance;
+
+        // Also update the participant in the group's participants array
+        const group = CacheManager.getInstance().getGroup(this.groupId);
+        if (group) {
+          const participantIndex = group.participants.findIndex(
+            (p) => p.accountId === this.accountId
+          );
+          if (participantIndex !== -1) {
+            group.participants[participantIndex].balance = balance;
+            group.participants[participantIndex].equity = equity;
+            group.participants[participantIndex].pnlPercentage = parseFloat(
+              pnlPercentage.toFixed(2)
+            );
+            group.participants[participantIndex].profitLoss = equity - balance;
+          }
+        }
+      }
+    }
   }
 
   onOrderUpdated(order: any) {
@@ -55,6 +89,22 @@ export class OrderSyncListener {
     ) {
       handleCloseAllOrders(this.groupId, this.accountId);
     }
+
+    // Update orders in cache
+    const connection = activeConnections.find(
+      (conn) =>
+        conn.accountId === this.accountId && conn.groupId === this.groupId
+    );
+
+    if (connection && connection.connection) {
+      const terminalState = connection.connection.terminalState;
+      if (terminalState && terminalState.orders) {
+        CacheManager.getInstance().setOrders(
+          this.accountId,
+          terminalState.orders
+        );
+      }
+    }
   }
 
   onOrdersReplaced(orders: any[]) {
@@ -68,6 +118,18 @@ export class OrderSyncListener {
     ) {
       handleCloseAllOrders(this.groupId, this.accountId);
     }
+
+    // Update orders in cache directly
+    CacheManager.getInstance().setOrders(this.accountId, orders);
+
+    // Force refresh account data to get updated equity/balance
+    CacheManager.getInstance()
+      .forceRefreshAccountData(this.groupId, this.accountId)
+      .catch((error) => {
+        console.error(
+          `Error refreshing account data after orders update: ${error}`
+        );
+      });
   }
 
   onOrderCompleted(orderId: string, order: any) {
@@ -114,6 +176,22 @@ export class OrderSyncListener {
     if (frozenAccount && frozenAccount.active) {
       handleCloseAllPositions(this.groupId, this.accountId);
     }
+
+    // Update positions in cache
+    const connection = activeConnections.find(
+      (conn) =>
+        conn.accountId === this.accountId && conn.groupId === this.groupId
+    );
+
+    if (connection && connection.connection) {
+      const terminalState = connection.connection.terminalState;
+      if (terminalState && terminalState.positions) {
+        CacheManager.getInstance().setPositions(
+          this.accountId,
+          terminalState.positions
+        );
+      }
+    }
   }
 
   onPositionsReplaced(positions: any[]) {
@@ -134,6 +212,18 @@ export class OrderSyncListener {
     ) {
       handleCloseAllPositions(this.groupId, this.accountId);
     }
+
+    // Update positions in cache directly
+    CacheManager.getInstance().setPositions(this.accountId, positions);
+
+    // Force refresh account data to get updated equity/balance
+    CacheManager.getInstance()
+      .forceRefreshAccountData(this.groupId, this.accountId)
+      .catch((error) => {
+        console.error(
+          `Error refreshing account data after positions update: ${error}`
+        );
+      });
   }
 
   onDealAdded(dealId: string, deal: any) {

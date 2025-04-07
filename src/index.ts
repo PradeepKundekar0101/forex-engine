@@ -36,7 +36,8 @@ app.listen(port, "0.0.0.0", () => {
     }
   };
   mongoConnect(process.env.MONGODB_URI || "");
-  CacheManager.getInstance().init();
+  // Initialize CacheManager with shorter trading data refresh interval (500ms) to ensure frequent updates
+  CacheManager.getInstance().init(30000, 2200);
   console.log(`Server is running on port ${port}`);
 });
 
