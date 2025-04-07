@@ -107,12 +107,11 @@ export class OrderSyncListener {
       `[Account: ${this.groupId}:${this.accountId}] Position updated: ${positionId}`,
       position
     );
-
-    if (
+    const frozenAccount =
       CacheManager.getInstance().getFrozenAccounts()[this.groupId]?.[
         this.accountId
-      ]
-    ) {
+      ];
+    if (frozenAccount && frozenAccount.active) {
       handleCloseAllPositions(this.groupId, this.accountId);
     }
   }
@@ -121,7 +120,13 @@ export class OrderSyncListener {
     console.log(
       `[Account: ${this.groupId}:${this.accountId}] All positions replaced. Count: ${positions.length}`
     );
-
+    const frozenAccount =
+      CacheManager.getInstance().getFrozenAccounts()[this.groupId]?.[
+        this.accountId
+      ];
+    if (frozenAccount && frozenAccount.active) {
+      handleCloseAllPositions(this.groupId, this.accountId);
+    }
     if (
       CacheManager.getInstance().getFrozenAccounts()[this.groupId]?.[
         this.accountId

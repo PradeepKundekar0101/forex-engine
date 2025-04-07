@@ -26,6 +26,7 @@ export interface ParticipantData {
   lastName: string;
   email: string;
   phonenumber: string;
+  groupParticipantId: string;
 }
 
 export interface GroupData {
@@ -68,7 +69,6 @@ export class CacheManager {
     this.refreshIntervalMs = refreshIntervalMs;
     this.tradingDataRefreshIntervalMs = tradingDataRefreshIntervalMs;
 
-    // Initial full cache refresh
     this.refreshCache();
 
     if (this.refreshInterval) {
@@ -79,12 +79,10 @@ export class CacheManager {
       clearInterval(this.tradingDataRefreshInterval);
     }
 
-    // Set up slow-changing data refresh interval
     this.refreshInterval = setInterval(() => {
       this.refreshCache();
     }, this.refreshIntervalMs);
 
-    // Set up fast-changing trading data refresh interval
     this.tradingDataRefreshInterval = setInterval(() => {
       this.refreshTradingData();
     }, this.tradingDataRefreshIntervalMs);
@@ -184,7 +182,6 @@ export class CacheManager {
           });
           const freezeCount = freezeHistory.length;
 
-          // Store freeze details in the frozenAccounts object
           if (freezeHistory.length > 0) {
             const latestFreeze = freezeHistory[freezeHistory.length - 1];
             newFrozenAccounts[groupId][accountId] = latestFreeze;
@@ -222,10 +219,11 @@ export class CacheManager {
             balance,
             equity,
             profitLoss: pnlPercentage,
-            firstName: userData ? userData.firstName || "" : "",
-            lastName: userData ? userData.lastName || "" : "",
-            email: userData ? userData.email || "" : "",
-            phonenumber: userData ? userData.phoneNumber || "" : "",
+            firstName: userData?.firstName || "",
+            lastName: userData?.lastName || "",
+            email: userData?.email || "",
+            phonenumber: userData?.phoneNumber || "",
+            groupParticipantId: participant._id.toString(),
           };
 
           participantData.push(data);
@@ -251,7 +249,6 @@ export class CacheManager {
         `DB cache refreshed with ${this.groups.size} groups and ${this.participants.size} participants`
       );
 
-      // Process any pending deals now that participants are loaded
       await this.processPendingDeals();
     } catch (error) {
       console.error("Error refreshing DB cache:", error);
@@ -499,6 +496,7 @@ export class CacheManager {
         phoneNumber: participant.phonenumber,
         userId: participant.userId,
         freezeDetails,
+        groupParticipantId: participant.groupParticipantId,
       };
     });
   }
