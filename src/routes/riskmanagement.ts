@@ -7,33 +7,32 @@ import Freeze from "../models/frozenAccount";
 const router = express.Router();
 
 router.post("/freeze", async (req, res) => {
-  const { groupId, accountId, reason } = req.body;
-  await freezeAccount(groupId, accountId, reason);
-  res.status(200).json({ message: "Account frozen" });
+  // Risk management disabled - account freezing not allowed
+  res
+    .status(200)
+    .json({ message: "Risk management disabled - no account freezing" });
 });
+
 router.post("/unfreeze", async (req, res) => {
   const { groupId, accountId } = req.body;
   await unfreezeAccount(groupId, accountId);
   res.status(200).json({ message: "Account unfrozen" });
 });
+
 router.get("/frozen", async (req, res) => {
-  const frozenAccounts = CacheManager.getInstance().getFrozenAccounts();
-  res.status(200).json(frozenAccounts);
+  // Always return empty frozen accounts list since risk management is disabled
+  res.status(200).json({});
 });
+
 router.get("/frozen/:groupId", async (req, res) => {
-  const { groupId } = req.params;
-  const frozenAccounts =
-    CacheManager.getInstance().getFrozenAccounts()[groupId];
-  res.status(200).json(frozenAccounts);
+  // Always return empty frozen accounts list since risk management is disabled
+  res.status(200).json({});
 });
+
 router.get("/frozen/:groupId/:accountId", async (req, res) => {
   try {
-    const { groupId, accountId } = req.params;
-    const frozenAccount = await Freeze.find({
-      groupId,
-      accountId,
-    });
-    res.status(200).json(frozenAccount);
+    // Always return empty frozen accounts list since risk management is disabled
+    res.status(200).json([]);
   } catch (error) {
     res.status(500).json({ error: "Internal server error" });
   }
