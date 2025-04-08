@@ -57,6 +57,9 @@ export async function checkAccountRisk(
   accountId: string,
   accountInfo: any
 ) {
+  // Risk management disabled - no account freezing
+  return;
+
   if (CacheManager.getInstance().getFrozenAccounts()[groupId]?.[accountId]) {
     return;
   }
@@ -331,6 +334,10 @@ export async function unfreezeAccount(groupId: string, accountId: string) {
 
 // Function to restore freeze timeouts on server restart
 export async function restoreFreezeTimeouts() {
+  // Risk management disabled - don't restore freeze timeouts
+  console.log("[Risk Management] Freeze functionality has been disabled");
+  return;
+
   try {
     console.log(
       "[Risk Management] Restoring freeze timeouts after server restart"
@@ -442,5 +449,38 @@ export async function cleanupFrozenAccount(groupId: string, accountId: string) {
     } else {
       delete accountEquityHistory[groupId][accountId];
     }
+  }
+}
+
+// Function to unfreeze all accounts
+export async function unfreezeAllAccounts() {
+  try {
+    console.log(
+      "[Risk Management] Unfreezing all accounts due to risk management being disabled"
+    );
+
+    // Find all active freeze records
+    const activeFreezesRecords = await Freeze.find({ active: true });
+
+    if (activeFreezesRecords.length === 0) {
+      console.log("[Risk Management] No active freeze records found");
+      return;
+    }
+
+    console.log(
+      `[Risk Management] Found ${activeFreezesRecords.length} active freeze records to unfreeze`
+    );
+
+    for (const record of activeFreezesRecords) {
+      const { groupId, accountId } = record;
+      console.log(
+        `[Risk Management] Unfreezing account ${accountId} in group ${groupId}`
+      );
+      await unfreezeAccount(groupId, accountId);
+    }
+
+    console.log("[Risk Management] All accounts unfrozen successfully");
+  } catch (error) {
+    console.error("[Risk Management] Error unfreezing all accounts:", error);
   }
 }
