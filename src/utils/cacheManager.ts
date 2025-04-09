@@ -163,20 +163,6 @@ export class CacheManager {
             connection = await connectToAccount(accountId, groupId);
           }
 
-          const deals = await Deal.find({
-            accountId,
-            groupId,
-          });
-          deals.map((deal) => {
-            if (this.participants.get(accountId)) {
-              const existingDealInCache = this.participants
-                .get(accountId)
-                ?.deals.find((d) => d.dealId === deal.dealId);
-              if (!existingDealInCache) {
-                this.participants.get(accountId)?.deals.push(deal);
-              }
-            }
-          });
           const freezeHistory = await Freeze.find({
             accountId,
             groupId,
@@ -211,7 +197,7 @@ export class CacheManager {
             freezeCount,
             pnlPercentage: parseFloat(pnlPercentage.toFixed(2)),
             tradeCount: existingParticipant?.tradeCount || 0,
-            deals: existingParticipant?.deals || [],
+            deals: [],
             positions:
               existingParticipant?.positions ||
               connection?.connection.terminalState.positions ||
@@ -309,16 +295,7 @@ export class CacheManager {
                 );
 
                 participant.profitLoss = equity - initialBalance;
-                if (
-                  group &&
-                  pnlPercentage < 0 &&
-                  Math.abs(pnlPercentage) >= group?.freezeThreshold
-                ) {
-                  console.log("pnlPercentage", pnlPercentage);
-                  console.log("group?.freezeThreshold", group?.freezeThreshold);
-                  console.log("Freezing account", accountId);
-                  await freezeAccount(groupId, accountId, "Drawdown", true);
-                }
+                // Risk management disabled - no account freezing
               }
 
               participant.positions = terminalState.positions || [];
