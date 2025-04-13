@@ -201,7 +201,7 @@ export class CacheManager {
             pnlPercentage: parseFloat(pnlPercentage.toFixed(2)),
             currentPnlPercentage: parseFloat(currentPnlPercentage.toFixed(2)),
             tradeCount: existingParticipant?.tradeCount || 0,
-            deals: existingParticipant?.deals || [],
+            deals: [],
             positions:
               existingParticipant?.positions ||
               connection?.connection.terminalState.positions ||
@@ -305,6 +305,7 @@ export class CacheManager {
                 );
 
                 participant.profitLoss = equity - initialBalance;
+
                 if (
                   group &&
                   group.createdAt > new Date("2025-04-12T10:00:00Z") &&
@@ -316,6 +317,7 @@ export class CacheManager {
                   console.log("Freezing account", accountId);
                   await freezeAccount(groupId, accountId, "Drawdown", true);
                 }
+
               }
 
               participant.positions = terminalState.positions || [];

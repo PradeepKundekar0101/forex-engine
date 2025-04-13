@@ -1,4 +1,5 @@
 import { activeConnections, api } from "../constants/global";
+import Mt5Connection from "../models/mt5Connections";
 import { OrderSyncListener } from "../services/OrderSyncListener";
 import { CacheManager } from "./cacheManager";
 
@@ -13,7 +14,16 @@ export const connectToAccount = async (accountId: string, groupId: string) => {
     const account = await api.metatraderAccountApi.getAccount(accountId);
     const initialState = account.state;
     const deployedStates = ["DEPLOYING", "DEPLOYED"];
-
+    if (initialState == "UNDEPLOYED") {
+      await account.remove();
+      await Mt5Connection.deleteOne({ accountId });
+      activeConnections.splice(
+        activeConnections.findIndex((conn) => conn.accountId === accountId),
+        1
+      );
+      console.log(`Account ${accountId} removed from MetaTrader`);
+      return;
+    }
     if (!deployedStates.includes(initialState)) {
       console.log(`Deploying account: ${accountId}`);
       await account.deploy();

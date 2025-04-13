@@ -6,7 +6,7 @@ import { CacheManager } from "./utils/cacheManager";
 import accountRoutes from "./routes/account";
 import leaderboardRoutes from "./routes/leaderboard";
 import riskmanagementRoutes from "./routes/riskmanagement";
-import { restoreFreezeTimeouts } from "./utils/riskmanagement";
+
 dotenv.config();
 
 const app = express();
@@ -28,7 +28,10 @@ app.listen(port, "0.0.0.0", () => {
       console.log(`MongoDB connected to ${connection.host}`);
       console.log("===========================");
 
+
       await restoreFreezeTimeouts();
+
+
     } catch (error) {
       console.log("MongoDB connection failed", error);
       return Promise.reject(error);

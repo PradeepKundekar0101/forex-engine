@@ -7,25 +7,11 @@ export const handleCloseAllPositions = async (
   groupId: string,
   accountId: string
 ) => {
-  try {
-    const connection = (
-      await api.metatraderAccountApi.getAccount(accountId)
-    ).getStreamingConnection();
-
-    // Always connect to ensure connection is initialized properly
-    await connection.connect();
-
-    console.log("Closing all positions");
-    const positions = connection.terminalState.positions;
-    for (const position of positions) {
-      await connection.closePosition(position.id.toString(), {
-        comment: "RM Emergency Close",
-      });
-    }
-  } catch (error) {
-    console.log("Error closing all positions", error);
-  }
+  // Risk management disabled - no position closing
+  console.log("Risk management disabled - not closing positions");
+  return;
 };
+
 export const handleCloseAllOrders = async (
   groupId: string,
   accountId: string
@@ -54,91 +40,9 @@ export async function freezeAccount(
   reason: string,
   automated: boolean = false
 ) {
-  try {
-    if (CacheManager.getInstance().getFrozenAccounts()[groupId]?.[accountId]) {
-      return;
-    }
-
-    const connection = activeConnections.find(
-      (conn) => conn.accountId === accountId
-    );
-    if (!connection) {
-      console.error(
-        `Cannot freeze account ${accountId}: not found in active connections`
-      );
-      return;
-    }
-    if (connection.connection.status !== "connected") {
-      console.error(
-        `Cannot freeze account ${accountId}: connection is not connected`
-      );
-      await connection.connection.connect();
-    }
-    const equity =
-      connection.connection.terminalState.accountInformation.equity;
-
-    console.log(
-      `[Risk Management] Freezing account ${accountId} for 1 hour due to: ${reason}`
-    );
-    handleCloseAllOrders(groupId, accountId);
-    handleCloseAllPositions(groupId, accountId);
-
-    const group = CacheManager.getInstance().getGroup(groupId);
-    if (!group) {
-      console.error(
-        `Group ${groupId} not found in cache, ignoring freeze event`
-      );
-      return;
-    }
-    // Add to frozen accounts
-    const releaseTimeout = setTimeout(() => {
-      unfreezeAccount(groupId, accountId);
-    }, group.freezeDuration);
-
-    const releaseTimeoutId = releaseTimeout[Symbol.toPrimitive]
-      ? releaseTimeout[Symbol.toPrimitive]()
-      : null;
-
-    if (!CacheManager.getInstance().getFrozenAccounts()[groupId]) {
-      CacheManager.getInstance().getFrozenAccounts()[groupId] = {};
-    }
-
-    const releaseTime = new Date(Date.now() + group.freezeDuration);
-
-    CacheManager.getInstance().getFrozenAccounts()[groupId][accountId] = {
-      accountId,
-      frozenAt: new Date(),
-      initialEquity: equity,
-      releaseTime,
-      reason,
-      _releaseTimeout: releaseTimeout,
-    };
-
-    const freezeRecord = new Freeze({
-      accountId,
-      reason,
-      automated,
-      groupId,
-      initialEquity: equity,
-      frozenAt: new Date(),
-      releaseTime,
-      active: true,
-    });
-
-    await freezeRecord.save();
-    console.log(
-      `[Risk Management] Saved freeze record to MongoDB for account ${accountId}`
-    );
-
-    console.log(
-      `[Risk Management] Account ${accountId} is now frozen until ${releaseTime.toISOString()}`
-    );
-  } catch (error) {
-    console.log(
-      `[Risk Management] Error freezing account ${accountId}:`,
-      error
-    );
-  }
+  // Risk management disabled - no account freezing
+  console.log("Risk management disabled - not freezing account");
+  return;
 }
 
 // Function to unfreeze an account after the timeout
@@ -166,6 +70,7 @@ export async function unfreezeAccount(groupId: string, accountId: string) {
     console.log(
       `[Risk Management] Updated freeze records in MongoDB for account ${accountId}`
     );
+
   } catch (error) {
     console.error(
       `[Risk Management] Error updating freeze records in MongoDB:`,
@@ -175,17 +80,25 @@ export async function unfreezeAccount(groupId: string, accountId: string) {
 }
 
 export async function restoreFreezeTimeouts() {
+  // Risk management disabled - don't restore freeze timeouts
+  console.log("[Risk Management] Freeze functionality has been disabled");
+  return;
+}
+
+// Function to unfreeze all accounts
+export async function unfreezeAllAccounts() {
   try {
     console.log(
       "[Risk Management] Restoring freeze timeouts after server restart"
     );
+
     const activeFreezesRecords = await Freeze.find({ active: true });
     if (activeFreezesRecords.length === 0) {
       console.log("[Risk Management] No active freeze records found");
       return;
     }
     console.log(
-      `[Risk Management] Found ${activeFreezesRecords.length} active freeze records`
+      `[Risk Management] Found ${activeFreezesRecords.length} active freeze records to unfreeze`
     );
     for (const record of activeFreezesRecords) {
       const { groupId, accountId } = record;
@@ -198,11 +111,11 @@ export async function restoreFreezeTimeouts() {
         continue;
       }
       const remainingTime = releaseTime.getTime() - Date.now();
+
       console.log(
-        `[Risk Management] Restoring freeze timeout for account ${accountId}, will release in ${
-          remainingTime / 1000
-        } seconds`
+        `[Risk Management] Unfreezing account ${accountId} in group ${groupId}`
       );
+
 
       if (!CacheManager.getInstance().getFrozenAccounts()[groupId]) {
         CacheManager.getInstance().getFrozenAccounts()[groupId] = {};
@@ -220,11 +133,12 @@ export async function restoreFreezeTimeouts() {
         reason: record.reason,
         _releaseTimeout: releaseTimeout,
       };
+
     }
 
-    console.log("[Risk Management] Freeze timeouts restored successfully");
+    console.log("[Risk Management] All accounts unfrozen successfully");
   } catch (error) {
-    console.error("[Risk Management] Error restoring freeze timeouts:", error);
+    console.error("[Risk Management] Error unfreezing all accounts:", error);
   }
 }
 
