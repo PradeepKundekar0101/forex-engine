@@ -15,6 +15,7 @@ export interface ParticipantData {
   groupId: string;
   freezeCount: number;
   pnlPercentage: number;
+  currentPnlPercentage: number;
   tradeCount: number;
   deals: any[];
   positions: any[];
@@ -37,6 +38,7 @@ export interface GroupData {
   freezeThreshold: number;
   freezeDuration: number;
   initialBalance: number;
+  createdAt: Date;
 }
 
 export class CacheManager {
@@ -111,7 +113,6 @@ export class CacheManager {
     if (this.refreshInProgress) {
       return;
     }
-
     try {
       this.refreshInProgress = true;
       console.log("Refreshing DB cache...");
@@ -163,20 +164,6 @@ export class CacheManager {
             connection = await connectToAccount(accountId, groupId);
           }
 
-          const deals = await Deal.find({
-            accountId,
-            groupId,
-          });
-          deals.map((deal) => {
-            if (this.participants.get(accountId)) {
-              const existingDealInCache = this.participants
-                .get(accountId)
-                ?.deals.find((d) => d.dealId === deal.dealId);
-              if (!existingDealInCache) {
-                this.participants.get(accountId)?.deals.push(deal);
-              }
-            }
-          });
           const freezeHistory = await Freeze.find({
             accountId,
             groupId,
@@ -196,11 +183,13 @@ export class CacheManager {
           const equity =
             connection?.connection.terminalState.accountInformation?.equity ||
             0;
-          const initialBalance = group ? group.initialBalance || 0 : 0;
+          const initialBalance = group.initialBalance || 0;
           const pnlPercentage =
             initialBalance > 0
               ? ((equity - initialBalance) / initialBalance) * 100
               : 0;
+          const currentPnlPercentage =
+            balance > 0 ? ((equity - balance) / balance) * 100 : 0;
           const name = connection?.account.name || `User ${accountId}`;
 
           const data: ParticipantData = {
@@ -210,6 +199,7 @@ export class CacheManager {
             groupId,
             freezeCount,
             pnlPercentage: parseFloat(pnlPercentage.toFixed(2)),
+            currentPnlPercentage: parseFloat(currentPnlPercentage.toFixed(2)),
             tradeCount: existingParticipant?.tradeCount || 0,
             deals: existingParticipant?.deals || [],
             positions:
@@ -242,6 +232,7 @@ export class CacheManager {
           freezeThreshold: group.freezeThreshold,
           freezeDuration: group.freezeDuration,
           initialBalance: group.initialBalance || 0,
+          createdAt: group.createdAt,
         });
       }
 
@@ -301,20 +292,26 @@ export class CacheManager {
                   initialBalance > 0
                     ? ((equity - initialBalance) / initialBalance) * 100
                     : 0;
+                const currentPnlPercentage =
+                  balance > 0 ? ((equity - balance) / balance) * 100 : 0;
 
                 participant.balance = balance;
                 participant.equity = equity;
                 participant.pnlPercentage = parseFloat(
                   pnlPercentage.toFixed(2)
                 );
+                participant.currentPnlPercentage = parseFloat(
+                  currentPnlPercentage.toFixed(2)
+                );
 
                 participant.profitLoss = equity - initialBalance;
                 if (
                   group &&
-                  pnlPercentage < 0 &&
-                  Math.abs(pnlPercentage) >= group?.freezeThreshold
+                  group.createdAt > new Date("2025-04-12T10:00:00Z") &&
+                  currentPnlPercentage < 0 &&
+                  Math.abs(currentPnlPercentage) >= group?.freezeThreshold
                 ) {
-                  console.log("pnlPercentage", pnlPercentage);
+                  console.log("currentPnlPercentage", currentPnlPercentage);
                   console.log("group?.freezeThreshold", group?.freezeThreshold);
                   console.log("Freezing account", accountId);
                   await freezeAccount(groupId, accountId, "Drawdown", true);
@@ -463,44 +460,14 @@ export class CacheManager {
   }
 
   public getLeaderboard(groupId: string): any[] {
-    // Force refresh all accounts in the group that were previously frozen
-    // but don't wait for the refresh to complete - do it asynchronously
-    const participants = this.getGroupParticipants(groupId);
-    for (const participant of participants) {
-      const accountId = participant.accountId;
-      // Check if this account was recently unfrozen
-      // This is a heuristic: if it has freeze count > 0 but is not in frozenAccounts
-      if (
-        participant.freezeCount > 0 &&
-        !this.frozenAccounts[groupId]?.[accountId]
-      ) {
-        this.forceRefreshAccountData(groupId, accountId).catch((error) => {
-          console.error(
-            `Error refreshing previously frozen account ${accountId}:`,
-            error
-          );
-        });
-      }
-    }
-
-    // Get the participants again to ensure we have the latest data
     const currentParticipants = this.getGroupParticipants(groupId);
     if (!currentParticipants.length) {
       return [];
     }
-
     const sortedParticipants = [...currentParticipants].sort(
       (a, b) => b.pnlPercentage - a.pnlPercentage
     );
     const group = this.getGroup(groupId);
-
-    // Log current data for debugging
-    console.log(`getLeaderboard for group ${groupId}:`);
-    for (const p of sortedParticipants) {
-      console.log(
-        `Account ${p.accountId}: PNL=${p.pnlPercentage}, Equity=${p.equity}, Balance=${p.balance}, ProfitLoss=${p.profitLoss}`
-      );
-    }
 
     return sortedParticipants.map((participant, index) => {
       let freezeDetails =
@@ -629,11 +596,16 @@ export class CacheManager {
           initialBalance > 0
             ? ((equity - initialBalance) / initialBalance) * 100
             : 0;
+        const currentPnlPercentage =
+          balance > 0 ? ((equity - balance) / balance) * 100 : 0;
 
         // Update participant in the participants map
         participant.balance = balance;
         participant.equity = equity;
         participant.pnlPercentage = parseFloat(pnlPercentage.toFixed(2));
+        participant.currentPnlPercentage = parseFloat(
+          currentPnlPercentage.toFixed(2)
+        );
         participant.profitLoss = equity - initialBalance;
         participant.positions = terminalState.positions || [];
         participant.orders = terminalState.orders || [];
@@ -651,6 +623,8 @@ export class CacheManager {
             groupData.participants[participantIndex].pnlPercentage = parseFloat(
               pnlPercentage.toFixed(2)
             );
+            groupData.participants[participantIndex].currentPnlPercentage =
+              parseFloat(currentPnlPercentage.toFixed(2));
             groupData.participants[participantIndex].profitLoss =
               equity - initialBalance;
             groupData.participants[participantIndex].positions =

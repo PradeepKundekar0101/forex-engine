@@ -28,7 +28,6 @@ app.listen(port, "0.0.0.0", () => {
       console.log(`MongoDB connected to ${connection.host}`);
       console.log("===========================");
 
-      // Restore freeze timeouts after MongoDB connection is established
       await restoreFreezeTimeouts();
     } catch (error) {
       console.log("MongoDB connection failed", error);
@@ -36,7 +35,6 @@ app.listen(port, "0.0.0.0", () => {
     }
   };
   mongoConnect(process.env.MONGODB_URI || "");
-  // Initialize CacheManager with shorter trading data refresh interval (500ms) to ensure frequent updates
   CacheManager.getInstance().init(30000, 2200);
   console.log(`Server is running on port ${port}`);
 });

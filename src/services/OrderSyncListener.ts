@@ -1,4 +1,3 @@
-import { orderHistory, orderPositionMapping } from "../constants/global";
 import { CacheManager } from "../utils/cacheManager";
 import {
   handleCloseAllOrders,
@@ -13,20 +12,6 @@ export class OrderSyncListener {
   constructor(groupId: string, accountId: string) {
     this.groupId = groupId;
     this.accountId = accountId;
-
-    if (!orderHistory[groupId]) {
-      orderHistory[groupId] = {};
-    }
-    if (!orderHistory[groupId][accountId]) {
-      orderHistory[groupId][accountId] = [];
-    }
-
-    if (!orderPositionMapping[groupId]) {
-      orderPositionMapping[groupId] = {};
-    }
-    if (!orderPositionMapping[groupId][accountId]) {
-      orderPositionMapping[groupId][accountId] = {};
-    }
   }
 
   onAccountInformationUpdated(accountInformation: any) {
@@ -36,8 +21,6 @@ export class OrderSyncListener {
     );
 
     if (accountInformation && typeof accountInformation.equity === "number") {
-      // checkAccountRisk(this.groupId, this.accountId, accountInformation);
-
       // Update trading data in the cache immediately
       const participant = CacheManager.getInstance().getParticipant(
         this.accountId
@@ -45,18 +28,19 @@ export class OrderSyncListener {
       if (participant) {
         const balance = accountInformation.balance || 0;
         const equity = accountInformation.equity || 0;
-        const pnlPercentage =
-          balance > 0 ? ((equity - balance) / balance) * 100 : 0;
 
         // Update participant in the participants map
         participant.balance = balance;
         participant.equity = equity;
-        participant.pnlPercentage = parseFloat(pnlPercentage.toFixed(2));
-        participant.profitLoss = equity - balance;
 
-        // Also update the participant in the group's participants array
         const group = CacheManager.getInstance().getGroup(this.groupId);
         if (group) {
+          const pnlPercentage =
+            balance > 0
+              ? ((equity - group.initialBalance) / group.initialBalance) * 100
+              : 0;
+          participant.profitLoss = equity - group.initialBalance;
+          participant.pnlPercentage = parseFloat(pnlPercentage.toFixed(2));
           const participantIndex = group.participants.findIndex(
             (p) => p.accountId === this.accountId
           );
@@ -66,7 +50,8 @@ export class OrderSyncListener {
             group.participants[participantIndex].pnlPercentage = parseFloat(
               pnlPercentage.toFixed(2)
             );
-            group.participants[participantIndex].profitLoss = equity - balance;
+            group.participants[participantIndex].profitLoss =
+              equity - group.initialBalance;
           }
         }
       }
@@ -74,36 +59,12 @@ export class OrderSyncListener {
   }
 
   onOrderUpdated(order: any) {
-    if (order.positionId) {
-      if (!orderPositionMapping[this.groupId][this.accountId]) {
-        orderPositionMapping[this.groupId][this.accountId] = {};
-      }
-      orderPositionMapping[this.groupId][this.accountId][order.positionId] =
-        order.id;
-    }
-
     if (
       CacheManager.getInstance().getFrozenAccounts()[this.groupId]?.[
         this.accountId
       ]
     ) {
       handleCloseAllOrders(this.groupId, this.accountId);
-    }
-
-    // Update orders in cache
-    const connection = activeConnections.find(
-      (conn) =>
-        conn.accountId === this.accountId && conn.groupId === this.groupId
-    );
-
-    if (connection && connection.connection) {
-      const terminalState = connection.connection.terminalState;
-      if (terminalState && terminalState.orders) {
-        CacheManager.getInstance().setOrders(
-          this.accountId,
-          terminalState.orders
-        );
-      }
     }
   }
 
@@ -118,18 +79,6 @@ export class OrderSyncListener {
     ) {
       handleCloseAllOrders(this.groupId, this.accountId);
     }
-
-    // Update orders in cache directly
-    CacheManager.getInstance().setOrders(this.accountId, orders);
-
-    // Force refresh account data to get updated equity/balance
-    CacheManager.getInstance()
-      .forceRefreshAccountData(this.groupId, this.accountId)
-      .catch((error) => {
-        console.error(
-          `Error refreshing account data after orders update: ${error}`
-        );
-      });
   }
 
   onOrderCompleted(orderId: string, order: any) {
@@ -137,31 +86,6 @@ export class OrderSyncListener {
       `[Account: ${this.groupId}:${this.accountId}] Order completed: ${orderId}`,
       order
     );
-
-    // Add to order history
-    if (order) {
-      if (!orderHistory[this.groupId][this.accountId]) {
-        orderHistory[this.groupId][this.accountId] = [];
-      }
-      order.completedAt = new Date().toISOString();
-      orderHistory[this.groupId][this.accountId].push(order);
-
-      // Keep history limited to last 100 orders
-      if (orderHistory[this.groupId][this.accountId].length > 100) {
-        orderHistory[this.groupId][this.accountId] =
-          orderHistory[this.groupId][this.accountId].slice(-100);
-      }
-    }
-
-    // If this order created a position, store the relationship
-    if (order && order.positionId) {
-      if (!orderPositionMapping[this.groupId][this.accountId]) {
-        orderPositionMapping[this.groupId][this.accountId] = {};
-      }
-      const fullPositionId = order.positionId;
-      orderPositionMapping[this.groupId][this.accountId][fullPositionId] =
-        orderId;
-    }
   }
 
   onPositionUpdated(positionId: string, position: any) {
@@ -236,26 +160,6 @@ export class OrderSyncListener {
       return;
     }
     CacheManager.getInstance().addDeal(this.accountId, deal);
-    // Initialize deals history if it doesn't exist
-    if (!orderHistory[this.groupId][this.accountId].deals) {
-      orderHistory[this.groupId][this.accountId].deals = [];
-    }
-
-    orderHistory[this.groupId][this.accountId].deals.push(historyEntry);
-
-    // If the deal has both order and position IDs, track the relationship
-    if (deal.orderId && deal.positionId) {
-      if (!orderPositionMapping[this.groupId][this.accountId]) {
-        orderPositionMapping[this.groupId][this.accountId] = {};
-      }
-      // Make sure to use the full position ID
-      const fullPositionId = deal.id || deal.positionId;
-      orderPositionMapping[this.groupId][this.accountId][fullPositionId] =
-        deal.orderId;
-      console.log(
-        `[Risk Management] Mapped position ${fullPositionId} to order ${deal.orderId} from deal`
-      );
-    }
   }
 
   onConnected() {}

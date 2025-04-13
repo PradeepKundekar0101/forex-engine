@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { activeConnections, api } from "../constants/global";
 import { OrderSyncListener } from "../services/OrderSyncListener";
 import Mt5Connection from "../models/mt5Connections";
-import { cacheManager } from "../utils/cacheManager";
+import { CacheManager, cacheManager } from "../utils/cacheManager";
 
 export const connectAccount = async (req: Request, res: Response) => {
   const {
@@ -123,4 +123,18 @@ export const getAccountDetails = async (req: Request, res: Response) => {
   const { userId } = req.params;
   const account = cacheManager.getUser(userId);
   res.status(200).json({ account });
+};
+export const disconnectAccount = async (req: Request, res: Response) => {
+  try {
+    const { accountId } = req.body;
+    const account = await api.metatraderAccountApi.getAccount(accountId);
+    if (account) {
+      await account.getStreamingConnection().account.remove();
+      await account.getStreamingConnection().account.undeploy();
+    }
+    res.status(200).json({ message: "Account disconnected" });
+  } catch (error) {
+    console.error("Error disconnecting account:", error);
+    res.status(500).json({ error: (error as any).message });
+  }
 };
