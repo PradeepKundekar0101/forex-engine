@@ -273,6 +273,8 @@ export class CacheManager {
             if (!connection) {
               connection = await connectToAccount(accountId, groupId);
               if (!connection) {
+                // Use delete method instead of filter since participants is a Map
+                this.participants.delete(accountId);
                 console.error(
                   `Failed to connect to account ${accountId} in group ${groupId}`
                 );
@@ -317,7 +319,6 @@ export class CacheManager {
                   console.log("Freezing account", accountId);
                   await freezeAccount(groupId, accountId, "Drawdown", true);
                 }
-
               }
 
               participant.positions = terminalState.positions || [];
