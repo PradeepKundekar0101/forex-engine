@@ -128,6 +128,7 @@ export const disconnectAccount = async (req: Request, res: Response) => {
   try {
     const { accountId } = req.body;
     const account = await api.metatraderAccountApi.getAccount(accountId);
+    console.log("Removing participant", account);
     if (account.id) {
       await account.getStreamingConnection().account.remove();
       await account.getStreamingConnection().account.undeploy();
