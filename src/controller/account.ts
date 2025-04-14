@@ -125,8 +125,8 @@ export const getAccountDetails = async (req: Request, res: Response) => {
   res.status(200).json({ account });
 };
 export const disconnectAccount = async (req: Request, res: Response) => {
+  const { accountId } = req.body;
   try {
-    const { accountId } = req.body;
     const account = await api.metatraderAccountApi.getAccount(accountId);
     console.log("Removing participant", account);
     if (account.id) {
@@ -136,7 +136,12 @@ export const disconnectAccount = async (req: Request, res: Response) => {
     CacheManager.getInstance().removeParticipant(accountId);
     res.status(200).json({ message: "Account disconnected" });
   } catch (error) {
-    console.error("Error disconnecting account:", error);
-    res.status(500).json({ error: (error as any).message });
+    if (error instanceof Error && error.message.includes("NotFoundError")) {
+      CacheManager.getInstance().removeParticipant(accountId);
+      res.status(200).json({ message: "Account disconnected" });
+    } else {
+      console.error("Error disconnecting account:", error);
+      res.status(500).json({ error: (error as any).message });
+    }
   }
 };
