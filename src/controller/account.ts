@@ -138,6 +138,6 @@ export const disconnectAccount = async (req: Request, res: Response) => {
   } catch (error) {
     CacheManager.getInstance().removeParticipant(accountId);
     console.error("Error disconnecting account:", error);
-    res.status(200).json({ error: (error as any).message });
+    res.status(200).json({ message: "Account disconnected" });
   }
 };
