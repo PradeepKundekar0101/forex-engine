@@ -7,6 +7,7 @@ import { activeConnections } from "../constants/global";
 import { connectToAccount } from "../utils/account";
 import Deal from "../models/deal";
 import { freezeAccount } from "./riskmanagement";
+import Mt5Connection from "../models/mt5Connections";
 
 export interface ParticipantData {
   userId: string;
@@ -421,6 +422,21 @@ export class CacheManager {
       if (error.code !== 11000) {
         console.error(`Error adding deal for account ${accountId}:`, error);
       }
+    }
+  }
+  public async removeParticipant(accountId: string): Promise<void> {
+    try {
+      this.groups.forEach((group) => {
+        const participantIndex = group.participants.findIndex(
+          (p) => p.accountId === accountId
+        );
+        if (participantIndex !== -1) {
+          group.participants.splice(participantIndex, 1);
+        }
+      });
+      await Mt5Connection.deleteOne({ accountId });
+    } catch (error) {
+      console.error(`Error removing participant ${accountId}:`, error);
     }
   }
 
