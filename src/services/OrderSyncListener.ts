@@ -59,7 +59,6 @@ export class OrderSyncListener {
   }
 
   onOrderUpdated(order: any) {
-
     if (
       CacheManager.getInstance().getFrozenAccounts()[this.groupId]?.[
         this.accountId
@@ -67,14 +66,12 @@ export class OrderSyncListener {
     ) {
       handleCloseAllOrders(this.groupId, this.accountId);
     }
-
   }
 
   onOrdersReplaced(orders: any[]) {
     console.log(
       `[Account: ${this.groupId}:${this.accountId}] All orders replaced. Count: ${orders.length}`
-    );  
-
+    );
   }
 
   onOrderCompleted(orderId: string, order: any) {
@@ -90,8 +87,6 @@ export class OrderSyncListener {
       position
     );
 
-    // Risk management disabled - don't close positions even if account is frozen
-    /*
     const frozenAccount =
       CacheManager.getInstance().getFrozenAccounts()[this.groupId]?.[
         this.accountId
@@ -99,7 +94,6 @@ export class OrderSyncListener {
     if (frozenAccount && frozenAccount.active) {
       handleCloseAllPositions(this.groupId, this.accountId);
     }
-    */
 
     // Update positions in cache
     const connection = activeConnections.find(
@@ -123,8 +117,6 @@ export class OrderSyncListener {
       `[Account: ${this.groupId}:${this.accountId}] All positions replaced. Count: ${positions.length}`
     );
 
-    // Risk management disabled - don't close positions even if account is frozen
-    /*
     const frozenAccount =
       CacheManager.getInstance().getFrozenAccounts()[this.groupId]?.[
         this.accountId
@@ -139,7 +131,6 @@ export class OrderSyncListener {
     ) {
       handleCloseAllPositions(this.groupId, this.accountId);
     }
-    */
 
     // Update positions in cache directly
     CacheManager.getInstance().setPositions(this.accountId, positions);

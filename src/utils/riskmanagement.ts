@@ -7,11 +7,25 @@ export const handleCloseAllPositions = async (
   groupId: string,
   accountId: string
 ) => {
-  // Risk management disabled - no position closing
-  console.log("Risk management disabled - not closing positions");
-  return;
-};
+  try {
+    const connection = (
+      await api.metatraderAccountApi.getAccount(accountId)
+    ).getStreamingConnection();
 
+    // Always connect to ensure connection is initialized properly
+    await connection.connect();
+
+    console.log("Closing all positions");
+    const positions = connection.terminalState.positions;
+    for (const position of positions) {
+      await connection.closePosition(position.id.toString(), {
+        comment: "RM Emergency Close",
+      });
+    }
+  } catch (error) {
+    console.log("Error closing all positions", error);
+  }
+};
 export const handleCloseAllOrders = async (
   groupId: string,
   accountId: string
@@ -53,9 +67,13 @@ export async function freezeAccount(
       reason,
       automated,
     };
-    const equity = (
+    const connection = (
       await api.metatraderAccountApi.getAccount(accountId)
-    ).getStreamingConnection().terminalState.accountInformation.equity;
+    ).getStreamingConnection();
+    const equity = connection.terminalState.accountInformation.equity;
+    // Close all positions and orders
+    await handleCloseAllPositions(groupId, accountId);
+    await handleCloseAllOrders(groupId, accountId);
     await Freeze.create({
       groupId,
       accountId,
