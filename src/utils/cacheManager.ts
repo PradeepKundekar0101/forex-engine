@@ -274,7 +274,6 @@ export class CacheManager {
             if (!connection) {
               connection = await connectToAccount(accountId, groupId);
               if (!connection) {
-                // Use delete method instead of filter since participants is a Map
                 this.participants.delete(accountId);
                 console.error(
                   `Failed to connect to account ${accountId} in group ${groupId}`
@@ -306,7 +305,6 @@ export class CacheManager {
                 participant.currentPnlPercentage = parseFloat(
                   currentPnlPercentage.toFixed(2)
                 );
-
                 participant.profitLoss = equity - initialBalance;
 
                 if (
@@ -603,7 +601,6 @@ export class CacheManager {
         return false;
       }
 
-      // Get the latest trading data from the connection
       const terminalState = connection.connection.terminalState;
       if (terminalState && terminalState.accountInformation) {
         const accountInfo = terminalState.accountInformation;

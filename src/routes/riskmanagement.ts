@@ -7,10 +7,13 @@ import Freeze from "../models/frozenAccount";
 const router = express.Router();
 
 router.post("/freeze", async (req, res) => {
-  // Risk management disabled - account freezing not allowed
-  res
-    .status(200)
-    .json({ message: "Risk management disabled - no account freezing" });
+  try {
+    const { groupId, accountId, reason } = req.body;
+    await freezeAccount(groupId, accountId, reason, false);
+    res.status(200).json({ message: "Account frozen" });
+  } catch (error) {
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 router.post("/unfreeze", async (req, res) => {
@@ -20,19 +23,29 @@ router.post("/unfreeze", async (req, res) => {
 });
 
 router.get("/frozen", async (req, res) => {
-  // Always return empty frozen accounts list since risk management is disabled
+  // Always return empty frozen accounts list since risk management is disable
   res.status(200).json({});
 });
 
 router.get("/frozen/:groupId", async (req, res) => {
-  // Always return empty frozen accounts list since risk management is disabled
-  res.status(200).json({});
+  try {
+    const { groupId } = req.params;
+    const frozenAccounts = await Freeze.find({ groupId, active: true });
+    res.status(200).json(frozenAccounts);
+  } catch (error) {
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 router.get("/frozen/:groupId/:accountId", async (req, res) => {
   try {
-    // Always return empty frozen accounts list since risk management is disabled
-    res.status(200).json([]);
+    const { groupId, accountId } = req.params;
+    const frozenAccount = await Freeze.findOne({
+      groupId,
+      accountId,
+      active: true,
+    });
+    res.status(200).json(frozenAccount);
   } catch (error) {
     res.status(500).json({ error: "Internal server error" });
   }

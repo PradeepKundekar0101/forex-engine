@@ -40,9 +40,34 @@ export async function freezeAccount(
   reason: string,
   automated: boolean = false
 ) {
-  // Risk management disabled - no account freezing
-  console.log("Risk management disabled - not freezing account");
-  return;
+  try {
+    const group = CacheManager.getInstance().getGroup(groupId);
+    if (!group) {
+      throw new Error("Group not found");
+    }
+    const releaseTime = new Date(Date.now() + group.freezeDuration);
+    CacheManager.getInstance().getFrozenAccounts()[groupId][accountId] = {
+      accountId,
+      frozenAt: new Date(),
+      releaseTime,
+      reason,
+      automated,
+    };
+    const equity = (
+      await api.metatraderAccountApi.getAccount(accountId)
+    ).getStreamingConnection().terminalState.accountInformation.equity;
+    await Freeze.create({
+      groupId,
+      accountId,
+      frozenAt: new Date(),
+      releaseTime,
+      reason,
+      automated,
+      initialEquity: equity,
+    });
+  } catch (error) {
+    console.error("Error freezing account", error);
+  }
 }
 
 // Function to unfreeze an account after the timeout
@@ -70,7 +95,6 @@ export async function unfreezeAccount(groupId: string, accountId: string) {
     console.log(
       `[Risk Management] Updated freeze records in MongoDB for account ${accountId}`
     );
-
   } catch (error) {
     console.error(
       `[Risk Management] Error updating freeze records in MongoDB:`,
@@ -116,7 +140,6 @@ export async function unfreezeAllAccounts() {
         `[Risk Management] Unfreezing account ${accountId} in group ${groupId}`
       );
 
-
       if (!CacheManager.getInstance().getFrozenAccounts()[groupId]) {
         CacheManager.getInstance().getFrozenAccounts()[groupId] = {};
       }
@@ -133,7 +156,6 @@ export async function unfreezeAllAccounts() {
         reason: record.reason,
         _releaseTimeout: releaseTimeout,
       };
-
     }
 
     console.log("[Risk Management] All accounts unfrozen successfully");
