@@ -1,8 +1,6 @@
 import express from "express";
-import { connectAccount, getAccountDetails } from "../controller/account";
 import { unfreezeAccount } from "../utils/riskmanagement";
 import { freezeAccount } from "../utils/riskmanagement";
-import { CacheManager } from "../utils/cacheManager";
 import Freeze from "../models/frozenAccount";
 const router = express.Router();
 

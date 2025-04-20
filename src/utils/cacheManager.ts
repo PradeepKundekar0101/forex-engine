@@ -245,8 +245,6 @@ export class CacheManager {
       console.log(
         `DB cache refreshed with ${this.groups.size} groups and ${this.participants.size} participants`
       );
-
-      await this.processPendingDeals();
     } catch (error) {
       console.error("Error refreshing DB cache:", error);
     } finally {
@@ -313,9 +311,6 @@ export class CacheManager {
                   currentPnlPercentage < 0 &&
                   Math.abs(currentPnlPercentage) >= group?.freezeThreshold
                 ) {
-                  console.log("currentPnlPercentage", currentPnlPercentage);
-                  console.log("group?.freezeThreshold", group?.freezeThreshold);
-                  console.log("Freezing account", accountId);
                   await freezeAccount(groupId, accountId, "Drawdown", true);
                 }
               }
@@ -371,57 +366,6 @@ export class CacheManager {
     return this.participants.get(accountId);
   }
 
-  public async addDeal(
-    accountId: string,
-    deal: any,
-    queueIfMissing: boolean = true
-  ): Promise<void> {
-    try {
-      const participant = this.participants.get(accountId);
-
-      if (!participant && queueIfMissing) {
-        console.log(
-          `Account ${accountId} not found in cache, queueing deal for later processing`
-        );
-        if (!this.pendingDeals.has(accountId)) {
-          this.pendingDeals.set(accountId, []);
-        }
-        this.pendingDeals.get(accountId)?.push(deal);
-        return;
-      }
-
-      if (participant && participant.groupId) {
-        const group = this.groups.get(participant.groupId);
-        if (group) {
-          const participantIndex = group.participants.findIndex(
-            (p) => p.accountId === accountId
-          );
-          if (participantIndex !== -1) {
-            const newDeal = {
-              accountId,
-              dealId: deal.id,
-              ...deal,
-            };
-            console.log("Updating deal", newDeal);
-
-            const existingDealInCache = group.participants[
-              participantIndex
-            ].deals.find((d) => d.dealId === deal.id);
-
-            if (!existingDealInCache) {
-              group.participants[participantIndex].deals.push(deal);
-              group.participants[participantIndex].tradeCount =
-                group.participants[participantIndex].deals.length;
-            }
-          }
-        }
-      }
-    } catch (error: any) {
-      if (error.code !== 11000) {
-        console.error(`Error adding deal for account ${accountId}:`, error);
-      }
-    }
-  }
   public async removeParticipant(accountId: string): Promise<void> {
     try {
       this.groups.forEach((group) => {
@@ -435,44 +379,6 @@ export class CacheManager {
       await Mt5Connection.deleteOne({ accountId });
     } catch (error) {
       console.error(`Error removing participant ${accountId}:`, error);
-    }
-  }
-
-  public setPositions(accountId: string, positions: any[]): void {
-    const participant = this.participants.get(accountId);
-    if (participant) {
-      participant.positions = positions;
-
-      if (participant.groupId) {
-        const group = this.groups.get(participant.groupId);
-        if (group) {
-          const participantIndex = group.participants.findIndex(
-            (p) => p.accountId === accountId
-          );
-          if (participantIndex !== -1) {
-            group.participants[participantIndex].positions = positions;
-          }
-        }
-      }
-    }
-  }
-
-  public setOrders(accountId: string, orders: any[]): void {
-    const participant = this.participants.get(accountId);
-    if (participant) {
-      participant.orders = orders;
-
-      if (participant.groupId) {
-        const group = this.groups.get(participant.groupId);
-        if (group) {
-          const participantIndex = group.participants.findIndex(
-            (p) => p.accountId === accountId
-          );
-          if (participantIndex !== -1) {
-            group.participants[participantIndex].orders = orders;
-          }
-        }
-      }
     }
   }
 
@@ -541,18 +447,6 @@ export class CacheManager {
       }
     }
     return undefined;
-  }
-
-  private async processPendingDeals(): Promise<void> {
-    for (const [accountId, deals] of this.pendingDeals.entries()) {
-      console.log(
-        `Processing ${deals.length} pending deals for account ${accountId}`
-      );
-      for (const deal of deals) {
-        await this.addDeal(accountId, deal, false);
-      }
-    }
-    this.pendingDeals.clear();
   }
 
   public getFrozenAccounts(): Record<string, Record<string, any>> {

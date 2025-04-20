@@ -68,19 +68,6 @@ export class OrderSyncListener {
     }
   }
 
-  onOrdersReplaced(orders: any[]) {
-    console.log(
-      `[Account: ${this.groupId}:${this.accountId}] All orders replaced. Count: ${orders.length}`
-    );
-  }
-
-  onOrderCompleted(orderId: string, order: any) {
-    console.log(
-      `[Account: ${this.groupId}:${this.accountId}] Order completed: ${orderId}`,
-      order
-    );
-  }
-
   onPositionUpdated(positionId: string, position: any) {
     console.log(
       `[Account: ${this.groupId}:${this.accountId}] Position updated: ${positionId}`,
@@ -93,22 +80,6 @@ export class OrderSyncListener {
       ];
     if (frozenAccount && frozenAccount.active) {
       handleCloseAllPositions(this.groupId, this.accountId);
-    }
-
-    // Update positions in cache
-    const connection = activeConnections.find(
-      (conn) =>
-        conn.accountId === this.accountId && conn.groupId === this.groupId
-    );
-
-    if (connection && connection.connection) {
-      const terminalState = connection.connection.terminalState;
-      if (terminalState && terminalState.positions) {
-        CacheManager.getInstance().setPositions(
-          this.accountId,
-          terminalState.positions
-        );
-      }
     }
   }
 
@@ -132,9 +103,6 @@ export class OrderSyncListener {
       handleCloseAllPositions(this.groupId, this.accountId);
     }
 
-    // Update positions in cache directly
-    CacheManager.getInstance().setPositions(this.accountId, positions);
-
     // Force refresh account data to get updated equity/balance
     CacheManager.getInstance()
       .forceRefreshAccountData(this.groupId, this.accountId)
@@ -145,20 +113,10 @@ export class OrderSyncListener {
       });
   }
 
-  onDealAdded(dealId: string, deal: any) {
-    const historyEntry = {
-      ...deal,
-      dealId,
-      recordedAt: new Date().toISOString(),
-    };
-    if (deal.comment === "RM Emergency Close") {
-      return;
-    }
-    CacheManager.getInstance().addDeal(this.accountId, deal);
-  }
-
   onConnected() {}
   onDisconnected() {}
+  onOrdersReplaced(orders: any[]) {}
+  onOrderCompleted(orderId: string, order: any) {}
   onPositionsUpdated(positions: any) {}
   onPositionRemoved(positionId: string) {}
   onPositionsSynchronized(positions: any) {}

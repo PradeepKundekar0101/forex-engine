@@ -2,6 +2,7 @@ import { api } from "../constants/global";
 import { activeConnections } from "../constants/global";
 import { CacheManager } from "./cacheManager";
 import Freeze from "../models/frozenAccount";
+import Group from "../models/group";
 
 export const handleCloseAllPositions = async (
   groupId: string,
@@ -55,10 +56,14 @@ export async function freezeAccount(
   automated: boolean = false
 ) {
   try {
-    const group = CacheManager.getInstance().getGroup(groupId);
+    const group = await Group.findById(groupId);
     if (!group) {
       throw new Error("Group not found");
     }
+    const releaseTimeout = setTimeout(() => {
+      unfreezeAccount(groupId, accountId);
+    }, group.freezeDuration);
+
     const releaseTime = new Date(Date.now() + group.freezeDuration);
     CacheManager.getInstance().getFrozenAccounts()[groupId][accountId] = {
       accountId,
@@ -66,14 +71,17 @@ export async function freezeAccount(
       releaseTime,
       reason,
       automated,
+      _releaseTimeout: releaseTimeout,
     };
     const connection = (
       await api.metatraderAccountApi.getAccount(accountId)
     ).getStreamingConnection();
     const equity = connection.terminalState.accountInformation.equity;
+
     // Close all positions and orders
     await handleCloseAllPositions(groupId, accountId);
     await handleCloseAllOrders(groupId, accountId);
+
     await Freeze.create({
       groupId,
       accountId,
@@ -90,15 +98,15 @@ export async function freezeAccount(
 
 // Function to unfreeze an account after the timeout
 export async function unfreezeAccount(groupId: string, accountId: string) {
-  if (!CacheManager.getInstance().getFrozenAccounts()[groupId]?.[accountId]) {
+  const frozenAccount =
+    CacheManager.getInstance().getFrozenAccounts()[groupId][accountId];
+  if (!frozenAccount) {
     return;
   }
 
   console.log(`[Risk Management] Unfreezing account ${accountId}`);
 
   // Remove from frozen accounts
-  const frozenAccount =
-    CacheManager.getInstance().getFrozenAccounts()[groupId][accountId];
   if (frozenAccount._releaseTimeout) {
     clearTimeout(frozenAccount._releaseTimeout);
   }
@@ -122,50 +130,57 @@ export async function unfreezeAccount(groupId: string, accountId: string) {
 }
 
 export async function restoreFreezeTimeouts() {
-  // Risk management disabled - don't restore freeze timeouts
-  console.log("[Risk Management] Freeze functionality has been disabled");
-  return;
-}
-
-// Function to unfreeze all accounts
-export async function unfreezeAllAccounts() {
   try {
     console.log(
       "[Risk Management] Restoring freeze timeouts after server restart"
     );
 
+    // Find all active freeze records
     const activeFreezesRecords = await Freeze.find({ active: true });
+
     if (activeFreezesRecords.length === 0) {
       console.log("[Risk Management] No active freeze records found");
       return;
     }
+
     console.log(
-      `[Risk Management] Found ${activeFreezesRecords.length} active freeze records to unfreeze`
+      `[Risk Management] Found ${activeFreezesRecords.length} active freeze records`
     );
+
     for (const record of activeFreezesRecords) {
       const { groupId, accountId } = record;
       const releaseTime = record.releaseTime as Date;
+
+      // Check if the release time has already passed
       if (new Date() >= releaseTime) {
+        // If the release time has passed, unfreeze immediately
         console.log(
           `[Risk Management] Release time already passed for account ${accountId}, unfreezing immediately`
         );
         await unfreezeAccount(groupId, accountId);
         continue;
       }
+
+      // Calculate the remaining time until release
       const remainingTime = releaseTime.getTime() - Date.now();
 
       console.log(
-        `[Risk Management] Unfreezing account ${accountId} in group ${groupId}`
+        `[Risk Management] Restoring freeze timeout for account ${accountId}, will release in ${
+          remainingTime / 1000
+        } seconds`
       );
 
+      // Initialize the frozen accounts structure if needed
       if (!CacheManager.getInstance().getFrozenAccounts()[groupId]) {
         CacheManager.getInstance().getFrozenAccounts()[groupId] = {};
       }
 
+      // Set a new timeout for the remaining duration
       const releaseTimeout = setTimeout(() => {
         unfreezeAccount(groupId, accountId);
       }, remainingTime);
 
+      // Store the account in the cache with the new timeout
       CacheManager.getInstance().getFrozenAccounts()[groupId][accountId] = {
         accountId: record.accountId,
         frozenAt: record.frozenAt,
@@ -176,9 +191,9 @@ export async function unfreezeAllAccounts() {
       };
     }
 
-    console.log("[Risk Management] All accounts unfrozen successfully");
+    console.log("[Risk Management] Freeze timeouts restored successfully");
   } catch (error) {
-    console.error("[Risk Management] Error unfreezing all accounts:", error);
+    console.error("[Risk Management] Error restoring freeze timeouts:", error);
   }
 }
 
