@@ -102,15 +102,6 @@ export class OrderSyncListener {
     ) {
       handleCloseAllPositions(this.groupId, this.accountId);
     }
-
-    // Force refresh account data to get updated equity/balance
-    CacheManager.getInstance()
-      .forceRefreshAccountData(this.groupId, this.accountId)
-      .catch((error) => {
-        console.error(
-          `Error refreshing account data after positions update: ${error}`
-        );
-      });
   }
 
   onConnected() {}

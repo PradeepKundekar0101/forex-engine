@@ -53,18 +53,32 @@ export async function freezeAccount(
   groupId: string,
   accountId: string,
   reason: string,
-  automated: boolean = false
+  automated: boolean = false,
+  freezeDuration: number | undefined
 ) {
   try {
+    if (CacheManager.getInstance().getFrozenAccounts()[groupId]?.[accountId]) {
+      return;
+    }
+    const frozenAccount = await Freeze.findOne({
+      groupId,
+      accountId,
+      active: true,
+    });
+    if (frozenAccount) {
+      return;
+    }
     const group = await Group.findById(groupId);
     if (!group) {
       throw new Error("Group not found");
     }
     const releaseTimeout = setTimeout(() => {
       unfreezeAccount(groupId, accountId);
-    }, group.freezeDuration);
+    }, freezeDuration || group.freezeDuration);
 
-    const releaseTime = new Date(Date.now() + group.freezeDuration);
+    const releaseTime = new Date(
+      Date.now() + (freezeDuration || group.freezeDuration)
+    );
     CacheManager.getInstance().getFrozenAccounts()[groupId][accountId] = {
       accountId,
       frozenAt: new Date(),
