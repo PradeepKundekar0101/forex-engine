@@ -8,6 +8,7 @@ import { connectToAccount } from "../utils/account";
 import Deal from "../models/deal";
 import { freezeAccount } from "./riskmanagement";
 import Mt5Connection from "../models/mt5Connections";
+import { logger } from "./logger";
 
 export interface ParticipantData {
   userId: string;
@@ -315,7 +316,9 @@ export class CacheManager {
                   currentPnlPercentage.toFixed(2)
                 );
                 participant.profitLoss = equity - initialBalance;
-
+                logger.info(
+                  `Participant ${accountId} in group ${groupId} current pnl percentage ${currentPnlPercentage} and freeze threshold ${participant.freezeThreshold} and group freeze threshold ${group?.freezeThreshold}`
+                );
                 if (
                   group &&
                   group.createdAt > new Date("2025-04-12T10:00:00Z") &&
@@ -323,6 +326,9 @@ export class CacheManager {
                   Math.abs(currentPnlPercentage) >=
                     (participant.freezeThreshold || group?.freezeThreshold)
                 ) {
+                  logger.info(
+                    `Freezing account ${accountId} in group ${groupId} due to drawdown`
+                  );
                   await freezeAccount(
                     groupId,
                     accountId,

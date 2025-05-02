@@ -13,6 +13,8 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@logtail/node": "^0.5.4",
+    "@logtail/winston": "^0.5.4",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
@@ -20,7 +22,8 @@
     "jsonwebtoken": "^9.0.2",
     "metaapi.cloud-sdk": "^29.0.4",
     "mongoose": "^8.13.2",
-    "validator": "^13.15.0"
+    "validator": "^13.15.0",
+    "winston": "^3.17.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
