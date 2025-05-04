@@ -422,12 +422,8 @@ export class CacheManager {
           group.participants.splice(participantIndex, 1);
         }
       });
-      await Mt5Connection.deleteOne({ accountId });
-      activeConnections.splice(
-        activeConnections.findIndex((conn) => conn.accountId === accountId),
-        1
-      );
-      await GroupParticipant.updateOne(
+
+      await GroupParticipant.updateMany(
         { accountId },
         { $set: { status: "removed" } }
       );
