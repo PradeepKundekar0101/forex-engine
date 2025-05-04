@@ -15,7 +15,7 @@ export const connectToAccount = async (accountId: string, groupId: string) => {
       `${process.env.METAAPI_URL}/users/current/accounts/${accountId}/account-information`,
       {
         headers: {
-          "auth-token": process.env.METAAPI_TOKEN as string,
+          "auth-token": process.env.METATRADER_API_KEY as string,
         },
       }
     );
