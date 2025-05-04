@@ -2,7 +2,8 @@ import { activeConnections, api } from "../constants/global";
 import Mt5Connection from "../models/mt5Connections";
 import { OrderSyncListener } from "../services/OrderSyncListener";
 import { CacheManager } from "./cacheManager";
-
+import axios from "axios";
+import { logger } from "./logger";
 export const connectToAccount = async (accountId: string, groupId: string) => {
   try {
     console.log(
@@ -10,6 +11,18 @@ export const connectToAccount = async (accountId: string, groupId: string) => {
         groupId ? ` in group ${groupId}` : ""
       }`
     );
+    const response = await axios.get(
+      `${process.env.METAAPI_URL}/users/current/accounts/${accountId}/account-information`,
+      {
+        headers: {
+          "auth-token": process.env.METAAPI_TOKEN as string,
+        },
+      }
+    );
+    logger.info("api response", response);
+    if (response.status === 404) {
+      return undefined;
+    }
 
     const account = await api.metatraderAccountApi.getAccount(accountId);
     const initialState = account.state;

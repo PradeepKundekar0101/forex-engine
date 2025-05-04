@@ -161,12 +161,31 @@ export class CacheManager {
           }
 
           const accountId = participant.accountId;
-          let connection = activeConnections.find(
+          let connection:
+            | {
+                groupId: string;
+                accountId: string;
+                account: any;
+                connection: any;
+                listener: any;
+              }
+            | undefined = undefined;
+          connection = activeConnections.find(
             (conn) => conn.accountId === accountId && conn.groupId === groupId
           );
 
           if (!connection) {
             connection = await connectToAccount(accountId, groupId);
+            if (!connection) {
+              logger.error(
+                `Failed to connect to account ${accountId} in group ${groupId}`
+              );
+              logger.info(
+                `Removing participant ${accountId} in group ${groupId}`
+              );
+              this.removeParticipant(accountId);
+              return;
+            }
           }
 
           const freezeHistory = await Freeze.find({
@@ -279,10 +298,13 @@ export class CacheManager {
             if (!connection) {
               connection = await connectToAccount(accountId, groupId);
               if (!connection) {
-                this.participants.delete(accountId);
-                console.error(
+                logger.error(
                   `Failed to connect to account ${accountId} in group ${groupId}`
                 );
+                logger.info(
+                  `Removing participant ${accountId} in group ${groupId}`
+                );
+                this.removeParticipant(accountId);
                 return;
               }
             }
@@ -401,6 +423,14 @@ export class CacheManager {
         }
       });
       await Mt5Connection.deleteOne({ accountId });
+      activeConnections.splice(
+        activeConnections.findIndex((conn) => conn.accountId === accountId),
+        1
+      );
+      await GroupParticipant.updateOne(
+        { accountId },
+        { $set: { status: "removed" } }
+      );
     } catch (error) {
       console.error(`Error removing participant ${accountId}:`, error);
     }
