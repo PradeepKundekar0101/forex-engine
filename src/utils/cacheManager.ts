@@ -290,9 +290,7 @@ export class CacheManager {
         async ([accountId, participant]) => {
           const { groupId } = participant;
           console.log("GROUP ID", groupId);
-          if (this.frozenAccounts[groupId]?.[accountId]) {
-            return;
-          }
+          console.log("ACCOUNT ID", accountId);
           try {
             let connection = activeConnections.find(
               (conn) => conn.accountId === accountId && conn.groupId === groupId
