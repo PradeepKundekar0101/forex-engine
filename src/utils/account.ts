@@ -3,7 +3,6 @@ import Mt5Connection from "../models/mt5Connections";
 import { OrderSyncListener } from "../services/OrderSyncListener";
 import { CacheManager } from "./cacheManager";
 import axios from "axios";
-import { logger } from "./logger";
 export const connectToAccount = async (accountId: string, groupId: string) => {
   try {
     console.log(
@@ -19,7 +18,6 @@ export const connectToAccount = async (accountId: string, groupId: string) => {
         },
       }
     );
-    logger.info("api response", response);
     if (response.status === 404) {
       return undefined;
     }
