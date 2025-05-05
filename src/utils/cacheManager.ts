@@ -289,7 +289,9 @@ export class CacheManager {
       const updatePromises = Array.from(this.participants.entries()).map(
         async ([accountId, participant]) => {
           const { groupId } = participant;
-
+          if (this.frozenAccounts[groupId]?.[accountId]) {
+            return;
+          }
           try {
             let connection = activeConnections.find(
               (conn) => conn.accountId === accountId && conn.groupId === groupId
@@ -350,6 +352,11 @@ export class CacheManager {
                 ) {
                   logger.info(
                     `Freezing account ${accountId} in group ${groupId} due to drawdown`
+                  );
+                  participant.initialBalance = balance;
+                  await GroupParticipant.updateOne(
+                    { accountId, groupId },
+                    { $set: { initialBalance: balance } }
                   );
                   await freezeAccount(
                     groupId,
