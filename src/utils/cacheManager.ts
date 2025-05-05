@@ -289,6 +289,7 @@ export class CacheManager {
       const updatePromises = Array.from(this.participants.entries()).map(
         async ([accountId, participant]) => {
           const { groupId } = participant;
+          console.log("GROUP ID", groupId);
           if (this.frozenAccounts[groupId]?.[accountId]) {
             return;
           }
