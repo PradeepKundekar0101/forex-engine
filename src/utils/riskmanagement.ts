@@ -56,9 +56,7 @@ export async function freezeAccount(
   accountId: string,
   reason: string,
   automated: boolean = false,
-  freezeDuration: number | undefined,
-  balance?: number,
-  equity?: number
+  freezeDuration: number | undefined
 ) {
   try {
     if (CacheManager.getInstance().getFrozenAccounts()[groupId]?.[accountId]) {
@@ -80,13 +78,18 @@ export async function freezeAccount(
       `Freezing account ${accountId} in group ${groupId} due to drawdown`
     );
     const participant = CacheManager.getInstance().getParticipant(accountId);
-    if (participant && balance) {
-      console.log("initialBalance", balance);
-      console.log("initialEquity", equity);
-      participant.initialBalance = balance;
+    await handleCloseAllPositions(groupId, accountId);
+    await handleCloseAllOrders(groupId, accountId);
+    const connection = (
+      await api.metatraderAccountApi.getAccount(accountId)
+    ).getStreamingConnection();
+    const equity = connection.terminalState.accountInformation.equity;
+    console.log("initialEquity", equity);
+    if (participant) {
+      participant.initialBalance = equity;
       const response = await GroupParticipant.updateOne(
         { accountId, groupId },
-        { $set: { initialBalance: balance } }
+        { $set: { initialBalance: equity } }
       );
       console.log(response);
     }
@@ -105,10 +108,6 @@ export async function freezeAccount(
       automated,
       _releaseTimeout: releaseTimeout,
     };
-
-    // Close all positions and orders
-    await handleCloseAllPositions(groupId, accountId);
-    await handleCloseAllOrders(groupId, accountId);
 
     await Freeze.create({
       groupId,

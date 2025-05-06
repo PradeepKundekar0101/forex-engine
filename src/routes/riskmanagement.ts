@@ -7,14 +7,7 @@ const router = express.Router();
 router.post("/freeze", async (req, res) => {
   try {
     const { groupId, accountId, reason } = req.body;
-    await freezeAccount(
-      groupId,
-      accountId,
-      reason,
-      false,
-      undefined,
-      undefined
-    );
+    await freezeAccount(groupId, accountId, reason, false, undefined);
     res.status(200).json({ message: "Account frozen" });
   } catch (error) {
     res.status(500).json({ error: "Internal server error" });
