@@ -351,8 +351,9 @@ export class CacheManager {
                     accountId,
                     "Drawdown",
                     true,
-                    participant.freezeDuration,
-                    balance
+                    participant.freezeDuration || group?.freezeDuration,
+                    balance,
+                    equity
                   );
                 }
               }

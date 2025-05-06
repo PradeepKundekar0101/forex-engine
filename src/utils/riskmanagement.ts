@@ -57,7 +57,8 @@ export async function freezeAccount(
   reason: string,
   automated: boolean = false,
   freezeDuration: number | undefined,
-  balance?: number
+  balance?: number,
+  equity?: number
 ) {
   try {
     if (CacheManager.getInstance().getFrozenAccounts()[groupId]?.[accountId]) {
@@ -81,6 +82,7 @@ export async function freezeAccount(
     const participant = CacheManager.getInstance().getParticipant(accountId);
     if (participant && balance) {
       console.log("initialBalance", balance);
+      console.log("initialEquity", equity);
       participant.initialBalance = balance;
       const response = await GroupParticipant.updateOne(
         { accountId, groupId },
@@ -103,10 +105,6 @@ export async function freezeAccount(
       automated,
       _releaseTimeout: releaseTimeout,
     };
-    const connection = (
-      await api.metatraderAccountApi.getAccount(accountId)
-    ).getStreamingConnection();
-    const equity = connection.terminalState.accountInformation.equity;
 
     // Close all positions and orders
     await handleCloseAllPositions(groupId, accountId);
