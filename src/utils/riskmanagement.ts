@@ -80,6 +80,7 @@ export async function freezeAccount(
     );
     const participant = CacheManager.getInstance().getParticipant(accountId);
     if (participant && balance) {
+      console.log("initialBalance", balance);
       participant.initialBalance = balance;
       const response = await GroupParticipant.updateOne(
         { accountId, groupId },
