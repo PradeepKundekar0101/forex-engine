@@ -3,6 +3,8 @@ import { activeConnections } from "../constants/global";
 import { CacheManager } from "./cacheManager";
 import Freeze from "../models/frozenAccount";
 import Group from "../models/group";
+import { logger } from "./logger";
+import GroupParticipant from "../models/groupParticipant";
 
 export const handleCloseAllPositions = async (
   groupId: string,
@@ -54,7 +56,8 @@ export async function freezeAccount(
   accountId: string,
   reason: string,
   automated: boolean = false,
-  freezeDuration: number | undefined
+  freezeDuration: number | undefined,
+  balance?: number
 ) {
   try {
     if (CacheManager.getInstance().getFrozenAccounts()[groupId]?.[accountId]) {
@@ -71,6 +74,18 @@ export async function freezeAccount(
     const group = await Group.findById(groupId);
     if (!group) {
       throw new Error("Group not found");
+    }
+    logger.info(
+      `Freezing account ${accountId} in group ${groupId} due to drawdown`
+    );
+    const participant = CacheManager.getInstance().getParticipant(accountId);
+    if (participant && balance) {
+      participant.initialBalance = balance;
+      const response = await GroupParticipant.updateOne(
+        { accountId, groupId },
+        { $set: { initialBalance: balance } }
+      );
+      console.log(response);
     }
     const releaseTimeout = setTimeout(() => {
       unfreezeAccount(groupId, accountId);

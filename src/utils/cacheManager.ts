@@ -346,21 +346,13 @@ export class CacheManager {
                   Math.abs(currentPnlPercentage) >=
                     (participant.freezeThreshold || group?.freezeThreshold)
                 ) {
-                  logger.info(
-                    `Freezing account ${accountId} in group ${groupId} due to drawdown`
-                  );
-                  participant.initialBalance = balance;
-                  const response = await GroupParticipant.updateOne(
-                    { accountId, groupId },
-                    { $set: { initialBalance: balance } }
-                  );
-                  console.log(response);
                   await freezeAccount(
                     groupId,
                     accountId,
                     "Drawdown",
                     true,
-                    participant.freezeDuration
+                    participant.freezeDuration,
+                    balance
                   );
                 }
               }
