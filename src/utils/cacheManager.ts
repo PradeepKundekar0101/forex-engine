@@ -339,9 +339,7 @@ export class CacheManager {
                   currentPnlPercentage.toFixed(2)
                 );
                 participant.profitLoss = equity - initialBalance;
-                logger.info(
-                  `Participant ${accountId} in group ${groupId} current pnl percentage ${currentPnlPercentage} and freeze threshold ${participant.freezeThreshold} and group freeze threshold ${group?.freezeThreshold}`
-                );
+
                 if (
                   group &&
                   group.createdAt > new Date("2025-04-12T10:00:00Z") &&
@@ -353,10 +351,11 @@ export class CacheManager {
                     `Freezing account ${accountId} in group ${groupId} due to drawdown`
                   );
                   participant.initialBalance = balance;
-                  await GroupParticipant.updateOne(
+                  const response = await GroupParticipant.updateOne(
                     { accountId, groupId },
                     { $set: { initialBalance: balance } }
                   );
+                  console.log(response);
                   await freezeAccount(
                     groupId,
                     accountId,
