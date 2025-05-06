@@ -289,8 +289,7 @@ export class CacheManager {
       const updatePromises = Array.from(this.participants.entries()).map(
         async ([accountId, participant]) => {
           const { groupId } = participant;
-          console.log("GROUP ID", groupId);
-          console.log("ACCOUNT ID", accountId);
+
           try {
             let connection = activeConnections.find(
               (conn) => conn.accountId === accountId && conn.groupId === groupId
