@@ -329,16 +329,6 @@ export class CacheManager {
                 const currentPnlPercentage =
                   balance > 0 ? ((equity - balance) / balance) * 100 : 0;
 
-                participant.balance = balance;
-                participant.equity = equity;
-                participant.pnlPercentage = parseFloat(
-                  pnlPercentage.toFixed(2)
-                );
-                participant.currentPnlPercentage = parseFloat(
-                  currentPnlPercentage.toFixed(2)
-                );
-                participant.profitLoss = equity - initialBalance;
-
                 if (
                   group &&
                   group.createdAt > new Date("2025-04-12T10:00:00Z") &&
@@ -354,13 +344,29 @@ export class CacheManager {
                     participant.freezeDuration || group?.freezeDuration
                   );
                 }
-              }
 
-              participant.positions = terminalState.positions || [];
-              participant.orders = terminalState.orders || [];
-              participant.tradeCount = participant.deals
-                ? participant.deals.length
-                : 0;
+                participant.balance =
+                  connection.connection.terminalState.accountInformation.balance;
+                participant.equity =
+                  connection.connection.terminalState.accountInformation.equity;
+                const newPnlPercentage =
+                  ((participant.equity - (participant.initialBalance || 0)) /
+                    (participant.initialBalance || 0)) *
+                  100;
+                participant.pnlPercentage = parseFloat(
+                  newPnlPercentage.toFixed(2)
+                );
+                participant.currentPnlPercentage = parseFloat(
+                  newPnlPercentage.toFixed(2)
+                );
+                participant.profitLoss =
+                  participant.equity - (participant.initialBalance || 0);
+                participant.positions = terminalState.positions || [];
+                participant.orders = terminalState.orders || [];
+                participant.tradeCount = participant.deals
+                  ? participant.deals.length
+                  : 0;
+              }
 
               if (group) {
                 const participantIndex = group.participants.findIndex(

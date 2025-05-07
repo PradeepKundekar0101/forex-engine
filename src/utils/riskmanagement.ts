@@ -25,6 +25,7 @@ export const handleCloseAllPositions = async (
         comment: "RM Emergency Close",
       });
     }
+    return connection;
   } catch (error) {
     console.log("Error closing all positions", error);
   }
@@ -46,6 +47,7 @@ export const handleCloseAllOrders = async (
     for (const order of orders) {
       await connection.cancelOrder(order.id.toString());
     }
+    return connection;
   } catch (error) {
     console.log("Error closing all orders", error);
   }
@@ -78,11 +80,11 @@ export async function freezeAccount(
       `Freezing account ${accountId} in group ${groupId} due to drawdown`
     );
     const participant = CacheManager.getInstance().getParticipant(accountId);
-    await handleCloseAllPositions(groupId, accountId);
+    const connection = await handleCloseAllPositions(groupId, accountId);
     await handleCloseAllOrders(groupId, accountId);
-    const connection = (
-      await api.metatraderAccountApi.getAccount(accountId)
-    ).getStreamingConnection();
+    if (!connection) {
+      throw new Error("Connection not found");
+    }
     const equity = connection.terminalState.accountInformation.equity;
     console.log("initialEquity", equity);
     if (participant) {
