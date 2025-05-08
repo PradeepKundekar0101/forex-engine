@@ -2,12 +2,9 @@ import Group from "../models/group";
 import GroupParticipant from "../models/groupParticipant";
 import Freeze from "../models/frozenAccount";
 import User from "../models/user";
-
 import { activeConnections } from "../constants/global";
 import { connectToAccount } from "../utils/account";
-import Deal from "../models/deal";
 import { freezeAccount } from "./riskmanagement";
-import Mt5Connection from "../models/mt5Connections";
 import { logger } from "./logger";
 
 export interface ParticipantData {
@@ -33,6 +30,7 @@ export interface ParticipantData {
   initialBalance: number | undefined;
   freezeThreshold: number | undefined;
   freezeDuration: number | undefined;
+  trackerId: string;
 }
 
 export interface GroupData {
@@ -245,6 +243,7 @@ export class CacheManager {
             initialBalance: participant.initialBalance || undefined,
             freezeThreshold: participant.freezeThreshold || undefined,
             freezeDuration: participant.freezeDuration || undefined,
+            trackerId: participant.trackerId || "",
           };
 
           participantData.push(data);
@@ -314,37 +313,6 @@ export class CacheManager {
             if (terminalState) {
               const accountInfo = terminalState.accountInformation;
               if (accountInfo) {
-                const balance = accountInfo.balance || 0;
-                const equity = accountInfo.equity || 0;
-                const initialBalance =
-                  participant && participant.initialBalance
-                    ? participant.initialBalance
-                    : group
-                    ? group.initialBalance
-                    : 0;
-                const pnlPercentage =
-                  initialBalance > 0
-                    ? ((equity - initialBalance) / initialBalance) * 100
-                    : 0;
-                const currentPnlPercentage =
-                  balance > 0 ? ((equity - balance) / balance) * 100 : 0;
-
-                if (
-                  group &&
-                  group.createdAt > new Date("2025-04-12T10:00:00Z") &&
-                  currentPnlPercentage < 0 &&
-                  Math.abs(currentPnlPercentage) >=
-                    (participant.freezeThreshold || group?.freezeThreshold)
-                ) {
-                  await freezeAccount(
-                    groupId,
-                    accountId,
-                    "Drawdown",
-                    true,
-                    participant.freezeDuration || group?.freezeDuration
-                  );
-                }
-
                 participant.balance =
                   connection.connection.terminalState.accountInformation.balance;
                 participant.equity =

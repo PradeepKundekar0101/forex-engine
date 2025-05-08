@@ -81,3 +81,5 @@ export function getProcessedItemKey(
 ): string {
   return `${groupId}:${accountId}:${itemId}`;
 }
+
+export const eventTracker = [];

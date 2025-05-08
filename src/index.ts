@@ -6,7 +6,10 @@ import { CacheManager } from "./utils/cacheManager";
 import accountRoutes from "./routes/account";
 import leaderboardRoutes from "./routes/leaderboard";
 import riskmanagementRoutes from "./routes/riskmanagement";
-import { restoreFreezeTimeouts } from "./utils/riskmanagement";
+import {
+  restoreFreezeTimeouts,
+  restoreTrackerEventListeners,
+} from "./utils/riskmanagement";
 
 dotenv.config();
 
@@ -30,6 +33,7 @@ app.listen(port, "0.0.0.0", () => {
       console.log("===========================");
 
       await restoreFreezeTimeouts();
+      await restoreTrackerEventListeners();
     } catch (error) {
       console.log("MongoDB connection failed", error);
       return Promise.reject(error);

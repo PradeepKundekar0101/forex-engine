@@ -1,10 +1,11 @@
 import { api } from "../constants/global";
-import { activeConnections } from "../constants/global";
 import { CacheManager } from "./cacheManager";
 import Freeze from "../models/frozenAccount";
 import Group from "../models/group";
 import { logger } from "./logger";
 import GroupParticipant from "../models/groupParticipant";
+import { riskManagement } from "../constants/global";
+import { EventTracker } from "../services/TrackerListener";
 
 export const handleCloseAllPositions = async (
   groupId: string,
@@ -150,11 +151,116 @@ export async function unfreezeAccount(groupId: string, accountId: string) {
     console.log(
       `[Risk Management] Updated freeze records in MongoDB for account ${accountId}`
     );
+
+    // Create a new tracker with updated equity as initial balance
+    await createNewTracker(groupId, accountId);
   } catch (error) {
     console.error(
       `[Risk Management] Error updating freeze records in MongoDB:`,
       error
     );
+  }
+}
+
+// Function to create a new tracker after unfreezing
+export async function createNewTracker(groupId: string, accountId: string) {
+  try {
+    // Get the participant data
+    const groupParticipant = await GroupParticipant.findOne({
+      groupId: groupId,
+      accountId: accountId,
+    });
+
+    if (!groupParticipant) {
+      console.error(`[Risk Management] Participant not found for ${accountId}`);
+      return;
+    }
+
+    // Get the current equity from the account
+    const account = await api.metatraderAccountApi.getAccount(accountId);
+    if (!account) {
+      console.error(`[Risk Management] Account not found: ${accountId}`);
+      return;
+    }
+
+    const connection = account.getStreamingConnection();
+    await connection.connect();
+
+    // Wait for terminal state to be populated
+    let retries = 5;
+    while (
+      retries > 0 &&
+      (!connection.terminalState ||
+        !connection.terminalState.accountInformation)
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      retries--;
+    }
+
+    if (
+      !connection.terminalState ||
+      !connection.terminalState.accountInformation
+    ) {
+      console.error(
+        `[Risk Management] Failed to get account information for ${accountId}`
+      );
+      return;
+    }
+
+    const currentEquity = connection.terminalState.accountInformation.equity;
+
+    console.log(
+      `[Risk Management] Creating new tracker for ${accountId} with initial equity ${currentEquity}`
+    );
+
+    // Create a new tracker
+    const tracker = await riskManagement.riskManagementApi.createTracker(
+      accountId,
+      {
+        name: accountId + ":" + groupId,
+        period: "lifetime",
+        relativeDrawdownThreshold:
+          (groupParticipant.freezeThreshold || 0) / 100,
+        startBrokerTime: new Date().toISOString(),
+        endBrokerTime: new Date(
+          new Date().getTime() + 5 * 365 * 24 * 60 * 60 * 1000
+        ).toISOString(),
+      }
+    );
+
+    // Add event listener
+    const eventListener = new EventTracker(accountId, tracker.id);
+    const eventListenerId =
+      riskManagement.riskManagementApi.addTrackerEventListener(
+        eventListener,
+        accountId,
+        tracker.id
+      );
+
+    // Update the participant record with new tracker ID and initial balance
+    await GroupParticipant.updateOne(
+      { accountId, groupId },
+      {
+        $set: {
+          trackerId: tracker.id,
+          listenerId: eventListenerId,
+          initialBalance: currentEquity,
+        },
+      }
+    );
+
+    console.log(
+      `[Risk Management] New tracker created for ${accountId} with ID ${tracker.id}`
+    );
+
+    // Also update the cache manager
+    const participant = CacheManager.getInstance().getParticipant(accountId);
+    if (participant) {
+      participant.initialBalance = currentEquity;
+      participant.trackerId = tracker.id;
+    }
+  } catch (error) {
+    console.error(`[Risk Management] Error creating new tracker:`, error);
   }
 }
 
@@ -260,5 +366,97 @@ export async function cleanupFrozenAccount(groupId: string, accountId: string) {
         error
       );
     }
+  }
+}
+
+// Function to restore tracker event listeners on server restart
+export async function restoreTrackerEventListeners() {
+  try {
+    console.log(
+      "[Risk Management] Restoring tracker event listeners after server restart"
+    );
+
+    // Find all active participants
+    const participants = await GroupParticipant.find({
+      status: { $ne: "removed" },
+      trackerId: { $exists: true, $ne: null },
+    });
+
+    if (participants.length === 0) {
+      console.log("[Risk Management] No active trackers found");
+      return;
+    }
+
+    console.log(
+      `[Risk Management] Found ${participants.length} active trackers to restore`
+    );
+
+    for (const participant of participants) {
+      try {
+        // Don't recreate listeners for frozen accounts - they'll get new trackers when unfrozen
+        const isFrozen = await Freeze.findOne({
+          groupId: participant.groupId,
+          accountId: participant.accountId,
+          active: true,
+        });
+
+        if (isFrozen) {
+          console.log(
+            `[Risk Management] Account ${participant.accountId} is frozen, skipping tracker restore`
+          );
+          continue;
+        }
+
+        console.log(
+          `[Risk Management] Restoring tracker for account ${participant.accountId}`
+        );
+
+        // Skip if trackerId is missing
+        if (!participant.trackerId) {
+          console.log(
+            `[Risk Management] No trackerId found for ${participant.accountId}, skipping`
+          );
+          continue;
+        }
+
+        // Create a new event listener
+        const eventListener = new EventTracker(
+          participant.accountId,
+          participant.trackerId
+        );
+
+        // Register the event listener
+        const eventListenerId =
+          riskManagement.riskManagementApi.addTrackerEventListener(
+            eventListener,
+            participant.accountId,
+            participant.trackerId
+          );
+
+        // Update the listenerId in the database
+        await GroupParticipant.updateOne(
+          { _id: participant._id },
+          { $set: { listenerId: eventListenerId } }
+        );
+
+        console.log(
+          `[Risk Management] Restored tracker listener for ${participant.accountId}`
+        );
+      } catch (error) {
+        console.error(
+          `[Risk Management] Error restoring tracker for ${participant.accountId}:`,
+          error
+        );
+      }
+    }
+
+    console.log(
+      "[Risk Management] Tracker event listeners restored successfully"
+    );
+  } catch (error) {
+    console.error(
+      "[Risk Management] Error restoring tracker event listeners:",
+      error
+    );
   }
 }

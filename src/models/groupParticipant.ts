@@ -8,6 +8,8 @@ const groupParticipantSchema = new Schema({
     enum: ["pending", "approved", "rejected"],
     default: "pending",
   },
+  trackerId: { type: String },
+  listenerId: { type: String },
   initialBalance: { type: Number },
   freezeThreshold: { type: Number },
   freezeDuration: { type: Number },
