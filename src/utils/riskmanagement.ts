@@ -162,6 +162,19 @@ export async function unfreezeAccount(groupId: string, accountId: string) {
   }
 }
 
+// Helper function to format date in YYYY-MM-DD HH:mm:ss.SSS format
+function formatDateForTracker(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  const milliseconds = String(date.getMilliseconds()).padStart(3, "0");
+
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds}`;
+}
+
 // Function to create a new tracker after unfreezing
 export async function createNewTracker(groupId: string, accountId: string) {
   try {
@@ -213,6 +226,12 @@ export async function createNewTracker(groupId: string, accountId: string) {
       `[Risk Management] Creating new tracker for ${accountId} with initial equity ${currentEquity}`
     );
 
+    // Format dates for tracker
+    const startDate = new Date();
+    const endDate = new Date(
+      startDate.getTime() + 5 * 365 * 24 * 60 * 60 * 1000
+    );
+
     // Create a new tracker
     const tracker = await riskManagement.riskManagementApi.createTracker(
       accountId,
@@ -221,10 +240,8 @@ export async function createNewTracker(groupId: string, accountId: string) {
         period: "lifetime",
         relativeDrawdownThreshold:
           (groupParticipant.freezeThreshold || 0) / 100,
-        startBrokerTime: new Date().toISOString(),
-        endBrokerTime: new Date(
-          new Date().getTime() + 5 * 365 * 24 * 60 * 60 * 1000
-        ).toISOString(),
+        startBrokerTime: formatDateForTracker(startDate),
+        endBrokerTime: formatDateForTracker(endDate),
       }
     );
 
@@ -414,34 +431,59 @@ export async function restoreTrackerEventListeners() {
         // Skip if trackerId is missing
         if (!participant.trackerId) {
           console.log(
-            `[Risk Management] No trackerId found for ${participant.accountId}, skipping`
+            `[Risk Management] No trackerId found for ${participant.accountId}, creating new tracker`
+          );
+          // Create a new tracker since the existing one is invalid
+          await createNewTracker(
+            participant.groupId.toString(),
+            participant.accountId
           );
           continue;
         }
 
-        // Create a new event listener
-        const eventListener = new EventTracker(
-          participant.accountId,
-          participant.trackerId
-        );
-
-        // Register the event listener
-        const eventListenerId =
-          riskManagement.riskManagementApi.addTrackerEventListener(
-            eventListener,
+        // Try to verify the tracker exists and is valid
+        try {
+          // Attempt to get the tracker - if it fails, we'll recreate it
+          await riskManagement.riskManagementApi.getTracker(
             participant.accountId,
             participant.trackerId
           );
 
-        // Update the listenerId in the database
-        await GroupParticipant.updateOne(
-          { _id: participant._id },
-          { $set: { listenerId: eventListenerId } }
-        );
+          // Create a new event listener if the tracker is valid
+          const eventListener = new EventTracker(
+            participant.accountId,
+            participant.trackerId
+          );
 
-        console.log(
-          `[Risk Management] Restored tracker listener for ${participant.accountId}`
-        );
+          // Register the event listener
+          const eventListenerId =
+            riskManagement.riskManagementApi.addTrackerEventListener(
+              eventListener,
+              participant.accountId,
+              participant.trackerId
+            );
+
+          // Update the listenerId in the database
+          await GroupParticipant.updateOne(
+            { _id: participant._id },
+            { $set: { listenerId: eventListenerId } }
+          );
+
+          console.log(
+            `[Risk Management] Restored tracker listener for ${participant.accountId}`
+          );
+        } catch (error) {
+          console.error(
+            `[Risk Management] Error validating tracker for ${participant.accountId}, creating new one:`,
+            error
+          );
+          // Create a new tracker since the existing one is invalid
+          await createNewTracker(
+            participant.groupId.toString(),
+            participant.accountId
+          );
+          continue;
+        }
       } catch (error) {
         console.error(
           `[Risk Management] Error restoring tracker for ${participant.accountId}:`,
