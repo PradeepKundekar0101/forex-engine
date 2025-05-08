@@ -89,29 +89,24 @@ router.post("/:id/participants", async (req, res) => {
       return;
     }
 
-    // Format dates for tracker
-    const startDate = new Date();
-    const endDate = new Date(
-      startDate.getTime() + 5 * 365 * 24 * 60 * 60 * 1000
-    );
-
     let tracker = await riskManagement.riskManagementApi.createTracker(
       connection.accountId,
       {
         name: connection.accountId + ":" + group._id,
         period: "lifetime",
         relativeDrawdownThreshold: group.freezeThreshold / 100,
-        startBrokerTime: formatDateForTracker(startDate),
-        endBrokerTime: formatDateForTracker(endDate),
       }
     );
     const eventListener = new EventTracker(connection.accountId, tracker.id);
+    console.log("Tracker created", tracker);
+    console.log("Event listener created", eventListener);
     let eventListenerId =
       riskManagement.riskManagementApi.addTrackerEventListener(
         eventListener,
         connection.accountId,
         tracker.id
       );
+    console.log("Event listener id", eventListenerId);
     const participant = new GroupParticipant({
       groupId: group._id,
       userId,

@@ -7,6 +7,7 @@ import GroupParticipant from "../models/groupParticipant";
 
 export class EventTracker extends TrackerEventListener {
   constructor(accountId: string, trackerId: string) {
+    console.log("Tracker listener constructor", accountId, trackerId);
     super(accountId, trackerId);
   }
   async onTrackerEvent(trackerEvent: TrackerEvent) {

@@ -240,8 +240,6 @@ export async function createNewTracker(groupId: string, accountId: string) {
         period: "lifetime",
         relativeDrawdownThreshold:
           (groupParticipant.freezeThreshold || 0) / 100,
-        startBrokerTime: formatDateForTracker(startDate),
-        endBrokerTime: formatDateForTracker(endDate),
       }
     );
 
