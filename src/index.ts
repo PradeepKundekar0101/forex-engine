@@ -6,6 +6,7 @@ import { CacheManager } from "./utils/cacheManager";
 import accountRoutes from "./routes/account";
 import leaderboardRoutes from "./routes/leaderboard";
 import riskmanagementRoutes from "./routes/riskmanagement";
+import groupRoutes from "./routes/group";
 import {
   restoreFreezeTimeouts,
   restoreTrackerEventListeners,
@@ -47,3 +48,4 @@ app.listen(port, "0.0.0.0", () => {
 app.use("/api/account", accountRoutes);
 app.use("/api/leaderboard", leaderboardRoutes);
 app.use("/api/riskmanagement", riskmanagementRoutes);
+app.use("/api/group", groupRoutes);
