@@ -232,15 +232,25 @@ export async function createNewTracker(groupId: string, accountId: string) {
       startDate.getTime() + 5 * 365 * 24 * 60 * 60 * 1000
     );
 
+    // Calculate freeze threshold in decimal form
+    const thresholdValue = (groupParticipant.freezeThreshold || 0) / 100;
+
+    console.log(
+      `[Risk Management] Setting drawdown threshold to ${thresholdValue} (${groupParticipant.freezeThreshold}%)`
+    );
+
     // Create a new tracker
     const tracker = await riskManagement.riskManagementApi.createTracker(
       accountId,
       {
         name: accountId + ":" + groupId,
         period: "lifetime",
-        relativeDrawdownThreshold:
-          (groupParticipant.freezeThreshold || 0) / 100,
+        relativeDrawdownThreshold: thresholdValue,
       }
+    );
+
+    console.log(
+      `[Risk Management] Tracker created with ID ${tracker.id} and threshold ${thresholdValue}`
     );
 
     // Add event listener
@@ -251,6 +261,10 @@ export async function createNewTracker(groupId: string, accountId: string) {
         accountId,
         tracker.id
       );
+
+    console.log(
+      `[Risk Management] Event listener registered with ID ${eventListenerId}`
+    );
 
     // Update the participant record with new tracker ID and initial balance
     await GroupParticipant.updateOne(
@@ -264,15 +278,28 @@ export async function createNewTracker(groupId: string, accountId: string) {
       }
     );
 
-    console.log(
-      `[Risk Management] New tracker created for ${accountId} with ID ${tracker.id}`
-    );
-
     // Also update the cache manager
     const participant = CacheManager.getInstance().getParticipant(accountId);
     if (participant) {
       participant.initialBalance = currentEquity;
       participant.trackerId = tracker.id;
+    }
+
+    // Verify tracker creation by retrieving tracker details
+    try {
+      const verifiedTracker = await riskManagement.riskManagementApi.getTracker(
+        accountId,
+        tracker.id
+      );
+      console.log(
+        `[Risk Management] Verified tracker settings:`,
+        verifiedTracker
+      );
+    } catch (error) {
+      console.error(
+        `[Risk Management] Failed to verify tracker settings:`,
+        error
+      );
     }
   } catch (error) {
     console.error(`[Risk Management] Error creating new tracker:`, error);

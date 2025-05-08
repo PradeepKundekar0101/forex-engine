@@ -97,8 +97,20 @@ router.post("/:id/participants", async (req, res) => {
         relativeDrawdownThreshold: group.freezeThreshold / 100,
       }
     );
+
+    // Get the created tracker name format for logging
+    const trackerName = connection.accountId + ":" + group._id;
+
+    console.log("Tracker created with details:", {
+      accountId: connection.accountId,
+      groupId: group._id.toString(),
+      trackerId: tracker.id,
+      name: trackerName,
+      threshold: group.freezeThreshold / 100,
+      initialBalance: accountBalance,
+    });
+
     const eventListener = new EventTracker(connection.accountId, tracker.id);
-    console.log("Tracker created", tracker);
     console.log("Event listener created", eventListener);
     let eventListenerId =
       riskManagement.riskManagementApi.addTrackerEventListener(
