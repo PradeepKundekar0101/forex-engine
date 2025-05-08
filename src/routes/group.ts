@@ -88,7 +88,8 @@ router.post("/:id/participants", async (req, res) => {
         .json({ message: "Invalid initial balance in MT5 account" });
       return;
     }
-
+    //"startBrokerTime": "2025-05-08 09:22:37.475",
+    //check the format of startBrokerTime
     let tracker = await riskManagement.riskManagementApi.createTracker(
       connection.accountId,
       {
@@ -96,6 +97,7 @@ router.post("/:id/participants", async (req, res) => {
         period: "lifetime",
         absoluteDrawdownThreshold:
           (accountBalance / 100) * group.freezeThreshold,
+        startBrokerTime: formatDateForTracker(new Date()),
       }
     );
 
