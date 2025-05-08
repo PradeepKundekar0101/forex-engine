@@ -94,11 +94,11 @@ router.post("/:id/participants", async (req, res) => {
       {
         name: connection.accountId + ":" + group._id,
         period: "lifetime",
-        relativeDrawdownThreshold: group.freezeThreshold / 100,
+        absoluteDrawdownThreshold:
+          (accountBalance / 100) * group.freezeThreshold,
       }
     );
 
-    // Get the created tracker name format for logging
     const trackerName = connection.accountId + ":" + group._id;
 
     console.log("Tracker created with details:", {

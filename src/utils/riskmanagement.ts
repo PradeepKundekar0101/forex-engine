@@ -238,14 +238,15 @@ export async function createNewTracker(groupId: string, accountId: string) {
     console.log(
       `[Risk Management] Setting drawdown threshold to ${thresholdValue} (${groupParticipant.freezeThreshold}%)`
     );
-
+    const accountBalance = connection.terminalState.accountInformation.balance;
     // Create a new tracker
     const tracker = await riskManagement.riskManagementApi.createTracker(
       accountId,
       {
         name: accountId + ":" + groupId,
         period: "lifetime",
-        relativeDrawdownThreshold: thresholdValue,
+        absoluteDrawdownThreshold:
+          (accountBalance / 100) * (groupParticipant.freezeThreshold || 0),
       }
     );
 
