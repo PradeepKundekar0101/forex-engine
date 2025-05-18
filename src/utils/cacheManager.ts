@@ -338,7 +338,7 @@ export class CacheManager {
                   );
                   console.log("Equity after freeze", equity);
                   participant.initialBalance = equity;
-                  await GroupParticipant.updateOne(
+                  await GroupParticipant.updateMany(
                     { accountId },
                     { $set: { initialBalance: equity } }
                   );
