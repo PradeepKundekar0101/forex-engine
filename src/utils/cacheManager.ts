@@ -177,7 +177,10 @@ export class CacheManager {
           });
           const freezeCount = freezeHistory.length;
 
-          if (freezeHistory.length > 0) {
+          if (
+            freezeHistory.length > 0 &&
+            freezeHistory[freezeHistory.length - 1].active
+          ) {
             const latestFreeze = freezeHistory[freezeHistory.length - 1];
             newFrozenAccounts[groupId][accountId] = latestFreeze;
           }
