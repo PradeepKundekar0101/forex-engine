@@ -309,7 +309,10 @@ export class CacheManager {
                     : 0;
                 const currentPnlPercentage =
                   balance > 0 ? ((equity - balance) / balance) * 100 : 0;
-
+                console.log("Equity", equity);
+                console.log("Balance", balance);
+                console.log("Initial balance", initialBalance);
+                console.log("Current pnl percentage", currentPnlPercentage);
                 participant.balance = balance;
                 participant.equity = equity;
                 participant.pnlPercentage = parseFloat(
@@ -333,6 +336,7 @@ export class CacheManager {
                     true,
                     participant.freezeDuration
                   );
+                  console.log("Equity after freeze", equity);
                   participant.initialBalance = equity;
                   await GroupParticipant.updateOne(
                     { accountId },
