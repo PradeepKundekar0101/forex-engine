@@ -90,6 +90,7 @@ export const connectAccount = async (req: Request, res: Response) => {
         platform: "mt5",
         magic: 1000,
         application: "MetaApi",
+        metastatsApiEnabled: true,
         // riskManagementApiEnabled: true,
       });
       const accountId = newAccount.id;
