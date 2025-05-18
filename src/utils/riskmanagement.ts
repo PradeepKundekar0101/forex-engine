@@ -126,8 +126,10 @@ export async function unfreezeAccount(groupId: string, accountId: string) {
   if (frozenAccount._releaseTimeout) {
     clearTimeout(frozenAccount._releaseTimeout);
   }
-  CacheManager.getInstance().getFrozenAccounts()[groupId][accountId] = null;
 
+  CacheManager.getInstance().removeFrozenAccount(groupId, accountId);
+  console.log("Frozen account removed from cache");
+  console.log(CacheManager.getInstance().getFrozenAccounts());
   // Update MongoDB record
   try {
     await Freeze.updateMany(

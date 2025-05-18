@@ -414,6 +414,9 @@ export class CacheManager {
       console.error(`Error removing participant ${accountId}:`, error);
     }
   }
+  public removeFrozenAccount(groupId: string, accountId: string): void {
+    delete this.frozenAccounts[groupId][accountId];
+  }
 
   public getLeaderboard(groupId: string): any[] {
     const currentParticipants = this.getGroupParticipants(groupId);
