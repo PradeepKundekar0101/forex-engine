@@ -138,7 +138,7 @@ export class CacheManager {
         const participants = await GroupParticipant.find({
           groupId: group._id,
           status: "approved",
-          type: "real",
+          type: { $ne: "demo" },
         });
         const participantsWithGroupAndUser = await GroupParticipant.populate(
           participants,
