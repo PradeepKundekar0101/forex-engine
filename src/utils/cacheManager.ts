@@ -415,7 +415,11 @@ export class CacheManager {
     }
   }
   public removeFrozenAccount(groupId: string, accountId: string): void {
+    console.log(
+      `Removing frozen account: groupId=${groupId}, accountId=${accountId}`
+    );
     delete this.frozenAccounts[groupId][accountId];
+    console.log("Current frozen accounts:", this.frozenAccounts[groupId]);
   }
 
   public getLeaderboard(groupId: string): any[] {
