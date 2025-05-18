@@ -275,7 +275,7 @@ export const getLeaderboard = async (req: Request, res: Response) => {
       }
       //sort by rank
       leaderBoard.sort((a, b) => a.rank - b.rank);
-      res.status(200).json({ leaderBoard, timestamp: Date.now() });
+      res.status(200).json({ leaderboard: leaderBoard, timestamp: Date.now() });
       return;
     }
     const leaderboard = CacheManager.getInstance().getLeaderboard(groupId);
