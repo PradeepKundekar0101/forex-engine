@@ -72,6 +72,8 @@ export async function freezeAccount(
     if (!group) {
       throw new Error("Group not found");
     }
+    await handleCloseAllPositions(groupId, accountId);
+    await handleCloseAllOrders(groupId, accountId);
     const releaseTimeout = setTimeout(() => {
       unfreezeAccount(groupId, accountId);
     }, freezeDuration || group.freezeDuration);
@@ -93,8 +95,6 @@ export async function freezeAccount(
     const equity = connection.terminalState.accountInformation.equity;
 
     // Close all positions and orders
-    await handleCloseAllPositions(groupId, accountId);
-    await handleCloseAllOrders(groupId, accountId);
 
     await Freeze.create({
       groupId,

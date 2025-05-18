@@ -279,6 +279,10 @@ export class CacheManager {
               connection = await connectToAccount(accountId, groupId);
               if (!connection) {
                 this.participants.delete(accountId);
+                await GroupParticipant.updateOne(
+                  { accountId },
+                  { $set: { status: "removed" } }
+                );
                 console.error(
                   `Failed to connect to account ${accountId} in group ${groupId}`
                 );
