@@ -105,6 +105,7 @@ export async function freezeAccount(
       automated,
       initialEquity: equity,
     });
+    return equity;
   } catch (error) {
     console.error("Error freezing account", error);
   }

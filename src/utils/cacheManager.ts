@@ -318,17 +318,21 @@ export class CacheManager {
 
                 if (
                   group &&
-                  group.createdAt > new Date("2025-04-12T10:00:00Z") &&
                   currentPnlPercentage < 0 &&
                   Math.abs(currentPnlPercentage) >=
                     (participant.freezeThreshold || group?.freezeThreshold)
                 ) {
-                  await freezeAccount(
+                  const equity = await freezeAccount(
                     groupId,
                     accountId,
                     "Drawdown",
                     true,
                     participant.freezeDuration
+                  );
+                  participant.initialBalance = equity;
+                  await GroupParticipant.updateOne(
+                    { accountId },
+                    { $set: { initialBalance: equity } }
                   );
                 }
               }
