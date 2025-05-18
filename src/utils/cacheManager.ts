@@ -60,7 +60,10 @@ export class CacheManager {
   private refreshIntervalMs: number = 30000;
   private tradingDataRefreshIntervalMs: number = 2000;
 
-  private constructor() {}
+  private constructor() {
+    // Ensure frozenAccounts is properly initialized
+    this.frozenAccounts = {};
+  }
 
   public static getInstance(): CacheManager {
     if (!CacheManager.instance) {
@@ -269,10 +272,21 @@ export class CacheManager {
       const updatePromises = Array.from(this.participants.entries()).map(
         async ([accountId, participant]) => {
           const { groupId } = participant;
-          if (this.frozenAccounts[groupId]?.[accountId]) {
-            console.log("Account is frozen, skipping");
+
+          // More robust frozen account check
+          const isFrozen =
+            this.frozenAccounts &&
+            this.frozenAccounts[groupId] &&
+            this.frozenAccounts[groupId][accountId];
+
+          if (isFrozen) {
+            console.log(
+              `Account ${accountId} in group ${groupId} is frozen, skipping. Frozen data:`,
+              JSON.stringify(this.frozenAccounts[groupId][accountId])
+            );
             return;
           }
+
           try {
             let connection = activeConnections.find(
               (conn) => conn.accountId === accountId && conn.groupId === groupId
@@ -418,8 +432,22 @@ export class CacheManager {
     console.log(
       `Removing frozen account: groupId=${groupId}, accountId=${accountId}`
     );
-    delete this.frozenAccounts[groupId][accountId];
-    console.log("Current frozen accounts:", this.frozenAccounts[groupId]);
+
+    if (this.frozenAccounts && this.frozenAccounts[groupId]) {
+      delete this.frozenAccounts[groupId][accountId];
+
+      if (Object.keys(this.frozenAccounts[groupId]).length === 0) {
+        delete this.frozenAccounts[groupId];
+      }
+
+      console.log(
+        `Current frozen accounts for group ${groupId}:`,
+        this.frozenAccounts[groupId] || "none"
+      );
+      console.log("All frozen accounts:", JSON.stringify(this.frozenAccounts));
+    } else {
+      console.log(`No frozen accounts found for groupId=${groupId}`);
+    }
   }
 
   public getLeaderboard(groupId: string): any[] {
