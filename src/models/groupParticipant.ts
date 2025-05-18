@@ -14,6 +14,11 @@ const groupParticipantSchema = new Schema({
   accountId: { type: String, required: true },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
+  type: {
+    type: String,
+    enum: ["demo", "real"],
+    default: "real",
+  },
 });
 
 const GroupParticipant = model("GroupParticipant", groupParticipantSchema);
