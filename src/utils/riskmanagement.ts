@@ -58,6 +58,7 @@ export async function freezeAccount(
 ) {
   try {
     if (CacheManager.getInstance().getFrozenAccounts()[groupId]?.[accountId]) {
+      console.log("Account already frozen");
       return;
     }
     const frozenAccount = await Freeze.findOne({
@@ -125,7 +126,7 @@ export async function unfreezeAccount(groupId: string, accountId: string) {
   if (frozenAccount._releaseTimeout) {
     clearTimeout(frozenAccount._releaseTimeout);
   }
-  delete CacheManager.getInstance().getFrozenAccounts()[groupId][accountId];
+  CacheManager.getInstance().getFrozenAccounts()[groupId][accountId] = null;
 
   // Update MongoDB record
   try {
@@ -209,42 +210,5 @@ export async function restoreFreezeTimeouts() {
     console.log("[Risk Management] Freeze timeouts restored successfully");
   } catch (error) {
     console.error("[Risk Management] Error restoring freeze timeouts:", error);
-  }
-}
-
-// Add a cleanup function for frozen accounts when disconnecting
-export async function cleanupFrozenAccount(groupId: string, accountId: string) {
-  if (CacheManager.getInstance().getFrozenAccounts()[groupId]?.[accountId]) {
-    const frozenAccount =
-      CacheManager.getInstance().getFrozenAccounts()[groupId][accountId];
-    if (frozenAccount._releaseTimeout) {
-      clearTimeout(frozenAccount._releaseTimeout);
-    }
-
-    // Check if this is the only account in the group
-    if (
-      Object.keys(CacheManager.getInstance().getFrozenAccounts()[groupId])
-        .length === 1
-    ) {
-      delete CacheManager.getInstance().getFrozenAccounts()[groupId];
-    } else {
-      delete CacheManager.getInstance().getFrozenAccounts()[groupId][accountId];
-    }
-
-    // Update any active freeze records in MongoDB
-    try {
-      await Freeze.updateMany(
-        { accountId, active: true },
-        { $set: { active: false, releasedAt: new Date() } }
-      );
-      console.log(
-        `[Risk Management] Cleaned up freeze records in MongoDB for account ${groupId}:${accountId}`
-      );
-    } catch (error) {
-      console.error(
-        `[Risk Management] Error updating freeze records in MongoDB:`,
-        error
-      );
-    }
   }
 }
