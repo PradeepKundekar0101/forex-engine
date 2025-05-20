@@ -101,7 +101,7 @@ const getParticipantData = (
       userId: "67f304ec0f2376b8bbbea356",
       freezeDetails: {},
     },
-    avinash: {
+    Ganesh: {
       accountId: accountId,
       name: "235432109@Exness-MT5Real7",
       pnlPercentage: 36,
@@ -209,7 +209,7 @@ const getParticipantData = (
       userId: "67f304ec0f2376b8bbbea362",
       freezeDetails: {},
     },
-    Faizan: {
+    Bindhu: {
       accountId: accountId,
       name: "235789012@Exness-MT5Real3",
       pnlPercentage: 27,
